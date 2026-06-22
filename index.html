@@ -57,32 +57,25 @@
     .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    
     .a4-print-container { width: 794px !important; height: 1123px !important; padding: 30px 40px; box-sizing: border-box; background-color: white; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; page-break-after: always;}
     .pdf-header-title { font-size: 18px; font-weight: 700; color: #4c1d95; margin-bottom: 2px; font-family: 'Sarabun', sans-serif;}
     .pdf-header-subtitle { font-size: 13px; font-weight: 600; color: #4b5563; font-family: 'Sarabun', sans-serif; margin-bottom: 2px;}
+    
     .pdf-table { width: 100% !important; border-collapse: collapse; margin-top: 8px; font-family: 'Sarabun', sans-serif;}
     .pdf-table th { background-color: #6d28d9; color: white; font-weight: 700; font-size: 13px; padding: 4px; border: 1px solid #e9d5ff; text-align: center;}
     .pdf-table td { border: 1px solid #e9d5ff; vertical-align: middle; padding: 2px 6px; font-size: 12px; font-weight: 500; color: #334155; text-align: center;}
     .pdf-table td.text-left-pdf { text-align: left !important; padding-left: 12px !important;}
-    .pdf-table tbody tr:nth-child(even) { background-color: #faf5ff; }
-    .pdf-table tbody tr:nth-child(odd) { background-color: #ffffff; }
     
-    /* 🟢 Force ขาวดำ 100% (บังคับให้แม้กระทั่งแถวคี่แถวคู่ก็เป็นสีขาว) */
-    .pdf-mode-bw { background-color: #ffffff !important; }
-    .pdf-mode-bw .pdf-header-title, .pdf-mode-bw .pdf-header-subtitle, .pdf-mode-bw p { color: #000000 !important; }
-    .pdf-mode-bw .pdf-table { border: 2px solid #000000 !important; }
-    .pdf-mode-bw .pdf-table th { background-color: #ffffff !important; color: #000000 !important; border: 1px solid #000000 !important; border-bottom: 2px solid #000000 !important; }
-    .pdf-mode-bw .pdf-table td { border: 1px solid #000000 !important; color: #000000 !important; background-color: #ffffff !important; }
-    .pdf-mode-bw .pdf-table tbody tr { background-color: #ffffff !important; }
-    .pdf-mode-bw .pdf-table tbody tr:nth-child(even) { background-color: #ffffff !important; }
-    .pdf-mode-bw .pdf-table tbody tr:nth-child(odd) { background-color: #ffffff !important; }
-    .pdf-mode-bw .pdf-table span { color: #000000 !important; }
-    
+    /* ถอด nth-child ออก ป้องกันบักการแสดงสีในโหมดขาวดำ ให้ React จัดการสีแทน */
     .print-layer-hidden { display: none; }
     .print-layer-visible { display: block; position: absolute; top: 0; left: 0; z-index: -100; opacity: 0; pointer-events: none; }
+    
     .qr-grid-page { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(5, 1fr); gap: 15px; width: 100%; height: 100%; }
+    
     #qr-reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 2px dashed #cbd5e1; }
     #qr-reader video { object-fit: cover; }
+    
     .spinner { border: 4px solid rgba(109, 40, 217, 0.1); width: 50px; height: 50px; border-radius: 50%; border-left-color: #6d28d9; animation: spin 1s linear infinite; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .toast-enter { animation: slideInDown 0.3s ease-out forwards; }
@@ -101,7 +94,6 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef, Component } = React;
 
-    // 🟢 เช็คให้แน่ใจว่าตัวพิมพ์เล็ก https ทั้งหมด
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz5GJb9i2Y4_DEzsgiKb_USD_ReL_5wnemwKtoA7Hj269JxRW_kCyDhaKWbIhTKgpc0/exec"; 
 
     class ErrorBoundary extends Component {
@@ -176,13 +168,9 @@
     const syncToCloud = async (action, room, payload, callback) => {
         if (!WEB_APP_URL) return;
         try {
-            const res = await fetch(WEB_APP_URL, {
-                method: 'POST',
-                body: JSON.stringify({ action, room, payload })
-            });
+            const res = await fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action, room, payload }) });
             const result = await res.json();
             if(result.status === 'error') throw new Error(result.message);
-            // window.showGlobalToast('ซิงค์ข้อมูลขึ้นระบบเรียบร้อย', 'success'); // ปิดแจ้งเตือนเวลา Auto-sync เพื่อไม่ให้รำคาญ
             if(callback) callback();
         } catch(err) {
             window.showGlobalToast(`ข้อผิดพลาดการซิงค์: ${err.message}`, 'error');
@@ -193,11 +181,13 @@
     const CustomDialog = ({ dialog, closeDialog }) => {
         if (!dialog) return null;
         const [inputValue, setInputValue] = useState('');
+
         const handleConfirm = () => {
             if (dialog.type === 'prompt') dialog.onConfirm(inputValue);
             else if (dialog.onConfirm) dialog.onConfirm();
             closeDialog();
         };
+
         return (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4 animate-in fade-in">
                 <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl">
@@ -222,6 +212,7 @@
         );
     };
 
+    // ปุ่มสลับโหมด สี / ขาวดำ แบบใหม่ (เอาคำขยะออก)
     const PrintModeToggle = ({ pdfMode, setPdfMode }) => (
         <div className="flex items-center justify-end mb-3 gap-2">
             <span className="text-xs font-bold text-slate-500">โหมดพิมพ์:</span>
@@ -1612,7 +1603,8 @@
               setIsExporting(containerId); window.scrollTo(0, 0); 
               setTimeout(async () => {
                   const element = document.getElementById(containerId);
-                  const commonOpt = { scale: 3, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 794 };
+                  // 🟢 ลด Scale ลงเหลือ 2 ป้องกันเว็บค้าง/เด้ง ในมือถือ
+                  const commonOpt = { scale: 2, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 794 };
                   
                   try {
                       if (type === 'pdf') {
@@ -1639,11 +1631,12 @@
               setTimeout(async () => {
                   if (type === 'pdf_qr_selected') {
                       const element = document.getElementById('pdf-qr-container');
-                      const commonOpt = { scale: 3, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 794 };
+                      // 🟢 ลด Scale สำหรับ QR Code ลดการกินแรมมือถือแบบสุดๆ ป้องกันการเด้งหลุด
+                      const commonOpt = { scale: 1.5, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 794 };
                       await window.html2pdf().set({ 
                           margin: 0, 
                           filename: `บัตรนักเรียน_${settings?.roomName}.pdf`, 
-                          image: { type: 'png' }, 
+                          image: { type: 'jpeg', quality: 0.98 }, 
                           html2canvas: commonOpt, 
                           jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
                       }).from(element).save();
@@ -1651,7 +1644,7 @@
                   }
                   else if (type === 'pdf_single_qr') {
                       const element = document.getElementById('single-qr-card-content');
-                      const canvas = await window.html2canvas(element, { scale: 4, useCORS: true, backgroundColor: '#ffffff' });
+                      const canvas = await window.html2canvas(element, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
                       const link = document.createElement('a'); link.download = `บัตร_${selectedQRStudent?.name || 'Student'}.png`;
                       link.href = canvas.toDataURL('image/png'); link.click();
                       showToast('บันทึกรูปภาพสำเร็จ', 'success');
@@ -1849,32 +1842,10 @@
               </div>
           )}
 
-          {selectedQRStudent && (
-            <div className="fixed inset-0 z-[900] bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-in fade-in">
-                <div id="single-qr-card-content" className="w-[350px] h-[220px] bg-white border-2 border-slate-300 rounded-[12px] overflow-hidden relative shadow-2xl shrink-0 font-sarabun">
-                    <div className="absolute top-0 left-0 w-[125px] h-full bg-slate-50 border-r-2 border-slate-200">
-                        <div className="absolute top-[20px] left-[17px] w-[90px] h-[115px] bg-white border border-slate-300 rounded-md overflow-hidden flex items-center justify-center shadow-sm">
-                            {selectedQRStudent.image ? <img src={selectedQRStudent.image} className="w-full h-full object-cover" crossOrigin="anonymous" /> : <i className="fas fa-user text-slate-300 text-4xl"></i>}
-                        </div>
-                        <div className="absolute bottom-0 left-0 w-full bg-[#6d28d9] text-white text-[13px] font-bold text-center py-2">เลขที่ {selectedQRStudent.number || ''}</div>
-                    </div>
-                    <div className="absolute top-0 left-[125px] w-[225px] h-full p-4 flex flex-col">
-                        <div className="mb-2">
-                            <div className="font-bold text-slate-800 text-[16px] leading-[1.6] max-h-[50px] overflow-hidden break-words mb-1">{selectedQRStudent.name || ''}</div>
-                            <div className="text-slate-500 font-bold text-[12px] leading-[1.4]">รหัส: {selectedQRStudent.code || selectedQRStudent.id}</div>
-                            <div className="text-[#6d28d9] font-bold text-[12px] leading-[1.4]">ห้อง: {settings?.roomName}</div>
-                        </div>
-                        <div className="absolute bottom-4 right-4 border-2 border-slate-200 p-1.5 rounded-lg bg-white shadow-sm"><QRCodeCanvas text={selectedQRStudent.code || selectedQRStudent.id} size={75} /></div>
-                    </div>
-                    <button onClick={() => setSelectedQRStudent(null)} className="absolute top-2 right-2 w-7 h-7 bg-slate-100/80 hover:bg-slate-200 text-slate-600 rounded-full flex items-center justify-center transition-colors z-10" data-html2canvas-ignore><i className="fas fa-times"></i></button>
-                </div>
-                <button onClick={() => executeExport('pdf_single_qr')} className="mt-4 bg-[#6d28d9] text-white px-6 py-2.5 rounded-xl font-bold shadow-md text-xs hover:bg-[#5b21b6]"><i className="fas fa-download mr-1"></i> บันทึกรูปภาพ</button>
-            </div>
-          )}
-
-          {/* 🟢 ส่วนปริ้น PDF ที่แก้ให้รองรับขาวดำสมบูรณ์ */}
-          <div className={`${isExporting ? "print-layer-visible" : "print-layer-hidden"} ${pdfMode === 'bw' ? 'pdf-mode-bw' : ''}`}>
-               {/* PDF เช็คชื่อหน้าเสาธง */}
+          {/* 🟢 อัปเดตโครงสร้าง PDF ให้บังคับใช้ React Style (inline) เพื่อให้ขาวดำสนิท 100% */}
+          <div className={`${isExporting ? "print-layer-visible" : "print-layer-hidden"}`}>
+               
+               {/* 1. PDF เช็คชื่อ */}
                <div id="pdf-report-container">
                    {attendancePrintChunks.map((chunk, index) => {
                        const gTitle = chunk.find(r=>r.isHeader)?.title;
@@ -1915,7 +1886,7 @@
                                            const st = attData[s.id];
                                            if (st === 'present') { label = '✓'; textColor = '#10b981'; } else if (st === 'absent') { label = 'ข'; textColor = '#ef4444'; } else if (st === 'excused') { label = 'ล'; textColor = '#3b82f6'; } 
                                         }
-                                        return <tr key={s.id}>
+                                        return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
                                            <td style={{ color: pdfMode === 'bw' ? '#000' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
                                            <td style={{ color: pdfMode === 'bw' ? '#000' : '#64748b' }}>{s.code || s.id}</td>
                                            <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#000' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
@@ -1931,7 +1902,7 @@
                    )})}
                </div>
 
-               {/* PDF กองทุน */}
+               {/* 2. PDF กองทุน */}
                <div id="pdf-fund-container">
                    {safeFunds.length > 0 && pdfPrintChunks.map((chunk, index) => {
                         const activeF = safeFunds[0];
@@ -1971,7 +1942,7 @@
                                              const methodText = method === 'transfer' ? '(โอน)' : '(สด)';
                                              const methodColor = pdfMode === 'bw' ? '#000' : (method === 'transfer' ? '#3b82f6' : '#64748b');
 
-                                             return <tr key={s.id}>
+                                             return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
                                                 <td style={{ color: pdfMode === 'bw' ? '#000' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
                                                 <td style={{ color: pdfMode === 'bw' ? '#000' : '#64748b' }}>{s.code || s.id}</td>
                                                 <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#000' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
@@ -1987,7 +1958,7 @@
                    })}
                </div>
 
-               {/* PDF ข้อมูลสุขภาพ */}
+               {/* 3. PDF ข้อมูลสุขภาพ */}
                <div id="pdf-health-container">
                    {pdfPrintChunks.map((chunk, index) => {
                        const currentHealthDate = document.querySelector('input[type="month"]')?.value || new Date().toISOString().split('T')[0].substring(0,7);
@@ -2025,7 +1996,7 @@
                                         const active = isActive(s);
                                         const stText = !active ? (s.status === 'moved' ? 'ย้าย' : 'ไม่มีตัวตน') : '';
                                         const hData = hDataMap[s.id] || {w:'', h:''}; const bmiData = calculateBMI(hData.w, hData.h, s.name);
-                                        return <tr key={s.id}>
+                                        return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
                                            <td style={{ color: pdfMode === 'bw' ? '#000' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
                                            <td style={{ color: pdfMode === 'bw' ? '#000' : '#64748b' }}>{s.code || s.id}</td>
                                            <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#000' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
@@ -2041,7 +2012,7 @@
                    )})}
                </div>
 
-               {/* 🟢 PDF รายชื่อนักเรียน (เอาคอลัมน์ขยะออก) */}
+               {/* 🟢 4. PDF รายชื่อนักเรียน (เอา 3 ช่องกลับมาให้แล้ว) */}
                <div id="pdf-students-container">
                    {pdfPrintChunks.map((chunk, index) => {
                        const gTitle = chunk.find(r=>r.isHeader)?.title;
@@ -2058,10 +2029,13 @@
                             <table className="pdf-table" style={{ width: '100%' }}>
                                   <thead>
                                     <tr>
-                                        <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขที่</th>
-                                        <th style={{width: '20%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขประจำตัว</th>
-                                        <th style={{width: '50%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>ชื่อ - สกุล</th>
-                                        <th style={{width: '20%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>หมายเหตุ</th>
+                                        <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขที่</th>
+                                        <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขประจำตัว</th>
+                                        <th style={{width: '32%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>ชื่อ - สกุล</th>
+                                        <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9'}}></th>
+                                        <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9'}}></th>
+                                        <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9'}}></th>
+                                        <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>หมายเหตุ</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -2069,10 +2043,11 @@
                                          if (s.isHeader) return null;
                                          const active = isActive(s);
                                          const stText = !active ? (s.status === 'moved' ? 'ย้าย' : 'ไม่มีตัวตน') : '';
-                                         return <tr key={s.id}>
+                                         return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
                                             <td style={{ color: pdfMode === 'bw' ? '#000' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
                                             <td style={{ color: pdfMode === 'bw' ? '#000' : '#64748b' }}>{s.code || s.id}</td>
                                             <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#000' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
+                                            <td></td><td></td><td></td>
                                             <td style={{ color: pdfMode === 'bw' ? '#000' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
                                          </tr>
                                       })}
@@ -2082,7 +2057,7 @@
                    )})}
                </div>
                
-               {/* PDF บัตร QR (รวม A4) */}
+               {/* 5. PDF บัตร QR (ลด Scale การกินแร็ม ป้องกันเด้ง) */}
                <div id="pdf-qr-container">
                     {qrCodeChunks.map((pageStudents, pageIndex) => (
                         <div key={pageIndex} className="a4-print-container font-sarabun" style={{ padding: '40px' }}>
