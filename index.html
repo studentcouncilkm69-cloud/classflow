@@ -5,41 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ClassFlow - ระบบจัดการชั้นเรียน</title>
   
-  <!-- 🔴 ระบบดักจับ Error สีแดง (ถ้ามีข้อผิดพลาดจะเด้งขึ้นมาบังทันที) -->
+  <!-- ========================================================== -->
+  <!-- 🛑 ระบบดักจับ Error สีแดง (ป้องกันจอดำ/จอขาว) -->
+  <!-- ========================================================== -->
   <script>
     window.onerror = function(message, source, lineno, colno, error) {
-      // 1. ซ่อนหน้าโหลด "กำลังเตรียมระบบ"
       var loader = document.getElementById('loading-screen');
       if(loader) loader.style.display = 'none';
-      
-      // 2. สร้างกล่อง Error สีแดง
       var errBox = document.createElement('div');
       errBox.style.cssText = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:999999; display:flex; align-items:center; justify-content:center; padding:20px; font-family:sans-serif;";
-      
       var stack = error && error.stack ? error.stack : 'ไม่มีรายละเอียดเชิงลึก';
-      
       errBox.innerHTML = `
         <div style="background:white; padding:25px; border-radius:12px; border-left:8px solid #ef4444; max-width:500px; width:100%; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
           <h2 style="color:#ef4444; margin-top:0; font-size:20px; font-weight:bold;">🚨 ระบบเกิดข้อผิดพลาด!</h2>
           <p style="color:#333; font-size:14px; margin-bottom:10px;"><strong>ปัญหา:</strong> ${message}</p>
           <p style="color:#666; font-size:12px; margin-bottom:10px;"><strong>บรรทัดที่:</strong> ${lineno} : ${colno}</p>
-          <details style="background:#f1f5f9; padding:10px; border-radius:8px; margin-bottom:15px;">
-            <summary style="cursor:pointer; font-size:12px; font-weight:bold; color:#475569;">ดูรายละเอียดเชิงลึก (Stack Trace)</summary>
-            <pre style="font-size:10px; color:#ef4444; overflow-x:auto; margin-top:10px; white-space: pre-wrap;">${stack}</pre>
-          </details>
           <button onclick="this.parentElement.parentElement.remove()" style="background:#ef4444; color:white; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer; width:100%;">ปิดหน้าต่างนี้</button>
         </div>
       `;
       document.body.appendChild(errBox);
-      return false; // ปล่อยให้เบราว์เซอร์ทำงานต่อเผื่อรอด
+      return false; 
     };
-
-    // ดักจับ Error จากการดึงข้อมูล API หรือ Promise ที่พัง
     window.addEventListener('unhandledrejection', function(event) {
       window.onerror("API Error: " + (event.reason.message || "Unknown Rejection"), '', 0, 0, event.reason);
     });
   </script>
 
+  <!-- ========================================================== -->
+  <!-- 📦 LIBRARIES (Tailwind, FontAwesome, React, PDF, QR) -->
+  <!-- ========================================================== -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;900&family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -54,6 +48,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   
+  <!-- ========================================================== -->
+  <!-- 🎨 CUSTOM CSS & TAILWIND CONFIG -->
+  <!-- ========================================================== -->
   <script>
     tailwind.config = {
       theme: {
@@ -107,22 +104,25 @@
 </head>
 <body class="text-slate-800 antialiased font-sans">
 
+  <!-- โหลดสกรีน ป้องกันจอขาวระหว่างรอ React ทำงาน -->
   <div id="loading-screen" class="fixed inset-0 bg-slate-50 flex flex-col items-center justify-center z-[9999]">
     <div class="spinner mb-4"></div>
     <h2 class="text-xl font-bold text-[#6d28d9]">กำลังเตรียมระบบ...</h2>
   </div>
 
-  <div id="root" style="display:none;"></div>
+  <div id="root"></div>
 
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef, Component } = React;
 
-    // ==========================================
-    // 🟢 ใส่ลิงก์ Web App (API URL) ตรงนี้
-    // ==========================================
+    // ==========================================================
+    // ⚙️ 1. API CONFIGURATION
+    // ==========================================================
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwKdgG0bh4PAo9g-Vmgq5jdY6uiwgDqyV9aIesyBr3GoMdPzRPLin1yLohxNvmTaZ5G/exec"; 
-    // ==========================================
 
+    // ==========================================================
+    // 🛠️ 2. UTILITIES & HELPERS (ฟังก์ชันช่วยเหลือ)
+    // ==========================================================
     class ErrorBoundary extends Component {
       constructor(props) { super(props); this.state = { hasError: false }; }
       static getDerivedStateFromError(error) { return { hasError: true }; }
@@ -144,16 +144,11 @@
     }
 
     const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    
     const formatThaiDate = (dateStr) => { 
         if(!dateStr) return ''; const d = new Date(dateStr); if (isNaN(d.getTime())) return dateStr;
         const months = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
         return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()+543}`; 
-    };
-
-    const QRCodeCanvas = ({ text, size }) => {
-        const qrRef = useRef(null);
-        useEffect(() => { if (window.QRious && qrRef.current && text) new window.QRious({ element: qrRef.current, value: text, size: size, level: 'H' }); }, [text, size]);
-        return <canvas ref={qrRef} style={{ width: size, height: size }} className="rounded-lg shadow-sm border border-slate-100"></canvas>;
     };
 
     const calculateBMI = (weight, height, name = '') => {
@@ -212,16 +207,23 @@
         }
     };
 
+    // ==========================================================
+    // 🧩 3. SHARED COMPONENTS (คอมโพเนนต์ที่ใช้ร่วมกัน)
+    // ==========================================================
+    const QRCodeCanvas = ({ text, size }) => {
+        const qrRef = useRef(null);
+        useEffect(() => { if (window.QRious && qrRef.current && text) new window.QRious({ element: qrRef.current, value: text, size: size, level: 'H' }); }, [text, size]);
+        return <canvas ref={qrRef} style={{ width: size, height: size }} className="rounded-lg shadow-sm border border-slate-100"></canvas>;
+    };
+
     const CustomDialog = ({ dialog, closeDialog }) => {
         if (!dialog) return null;
         const [inputValue, setInputValue] = useState('');
-
         const handleConfirm = () => {
             if (dialog.type === 'prompt') dialog.onConfirm(inputValue);
             else if (dialog.onConfirm) dialog.onConfirm();
             closeDialog();
         };
-
         return (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4 animate-in fade-in">
                 <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl">
@@ -232,17 +234,13 @@
                         <h3 className="text-lg font-black text-slate-800">{dialog.title}</h3>
                         {dialog.message && <p className="text-sm text-slate-500 mt-2 whitespace-pre-line">{dialog.message}</p>}
                     </div>
-
                     {dialog.type === 'prompt' && (
                         <div className="mb-5">
                             <input type={dialog.inputType || 'text'} autoFocus value={inputValue} onChange={e=>setInputValue(e.target.value)} placeholder={dialog.placeholder || ''} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 text-center font-bold" />
                         </div>
                     )}
-
                     <div className="flex gap-2">
-                        {dialog.type !== 'alert' && (
-                            <button onClick={closeDialog} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200">ยกเลิก</button>
-                        )}
+                        {dialog.type !== 'alert' && <button onClick={closeDialog} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200">ยกเลิก</button>}
                         <button onClick={handleConfirm} className={`flex-1 py-3 text-white font-bold rounded-xl shadow-md ${dialog.type === 'alert' ? 'bg-amber-500' : (dialog.confirmColor || 'bg-blue-600')}`}>ตกลง</button>
                     </div>
                 </div>
@@ -258,6 +256,9 @@
         </div>
     );
 
+    // ==========================================================
+    // 🔐 4. LOGIN PAGE (หน้าเข้าสู่ระบบ)
+    // ==========================================================
     const LoginPage = ({ onLogin, availableRooms, savedSession, onClearSession, showDialog }) => {
       const [role, setRole] = useState('head'); 
       const [room, setRoom] = useState(availableRooms[0] || 'ม.1/1');
@@ -363,6 +364,9 @@
       );
     };
 
+    // ==========================================================
+    // 🛡️ 5. ADMIN DASHBOARD (หน้าผู้ดูแลระบบส่วนกลาง)
+    // ==========================================================
     const AdminDashboard = ({ rooms, setRooms, enterRoom, onLogout, showDialog, globalSettings, setGlobalSettings, onUpdateAdminPin }) => {
         const [newRoomBulk, setNewRoomBulk] = useState('');
         const [newAdminPin, setNewAdminPin] = useState('');
@@ -484,6 +488,9 @@
         )
     };
 
+    // ==========================================================
+    // 📊 6. TAB: DASHBOARD (ภาพรวมและประวัติ)
+    // ==========================================================
     const TabDashboard = ({ activeStudentsCount, records, currentDate, funds, sortedStudents, activities }) => {
         const [dashTab, setDashTab] = useState('overview'); 
         const [searchQuery, setSearchQuery] = useState('');
@@ -721,6 +728,9 @@
         );
     };
 
+    // ==========================================================
+    // 📝 7. TAB: ATTENDANCE (เช็คชื่อ)
+    // ==========================================================
     const TabAttendance = ({ sortedStudents, activeStudentsCount, records, setRecords, currentDate, setCurrentDate, activities, setActivities, attPrintSettings, setAttPrintSettings, exportExcel, showToast, showDialog, isAdmin, pdfMode, setPdfMode, userRoom }) => {
         const [attTab, setAttTab] = useState('manual'); 
         const [currentActivity, setCurrentActivity] = useState(activities[0] || 'หน้าเสาธง');
@@ -925,6 +935,9 @@
         );
     };
 
+    // ==========================================================
+    // 💰 8. TAB: FUND (กองทุน)
+    // ==========================================================
     const TabFund = ({ funds, setFunds, sortedStudents, activeStudentsCount, showToast, exportExcel, executeDocExport, showDialog, isAdmin, pdfMode, setPdfMode, userRoom }) => {
         const [newTitle, setNewTitle] = useState(''); const [newAmount, setNewAmount] = useState('');
         const [activeFundId, setActiveFundId] = useState(funds[0]?.id || null);
@@ -1106,6 +1119,9 @@
         );
     };
 
+    // ==========================================================
+    // 🏥 9. TAB: HEALTH (สุขภาพ BMI)
+    // ==========================================================
     const TabHealth = ({ healthRecords, setHealthRecords, sortedStudents, exportExcel, executeDocExport, showToast, showDialog, isAdmin, pdfMode, setPdfMode, userRoom }) => {
         const [currentHealthDate, setCurrentHealthDate] = useState(() => {
             const today = new Date(); return `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`; 
@@ -1128,9 +1144,10 @@
                     setIsSaving(true);
                     const newLockedState = !isHealthLocked;
                     const updatedRecord = { ...activeHealthRecord, isLocked: newLockedState };
+                    
                     const updatedRecords = [...healthRecords.filter(r => r.date !== currentHealthDate), updatedRecord];
                     setHealthRecords(updatedRecords);
-                    syncToCloud('saveHealth', userRoom, updatedRecord, () => setIsSaving(false));
+                    syncToCloud('saveHealth', userRoom, updatedRecords, () => setIsSaving(false));
                 }
             });
         };
@@ -1220,6 +1237,9 @@
         );
     };
 
+    // ==========================================================
+    // 👥 10. TAB: STUDENTS (รายชื่อนักเรียน & QR)
+    // ==========================================================
     const TabStudents = ({ safeStudents, setStudents, sortedStudents, activeStudentsCount, setSelectedQRStudent, showToast, exportExcel, executeDocExport, executeExport, userPin, showDialog, isAdmin, pdfMode, setPdfMode, userRoom, isExporting, setIsExporting }) => {
          const [newBulk, setNewBulk] = useState('');
          const [selectedPlan, setSelectedPlan] = useState('');
@@ -1399,6 +1419,9 @@
          )
       };
 
+    // ==========================================================
+    // ⚙️ 11. TAB: SETTINGS (การตั้งค่า)
+    // ==========================================================
       const TabSettings = ({ settings, setSettings, showToast, user, onUpdatePin, showDialog }) => {
           const [newPin, setNewPin] = useState('');
           const [confirmPin, setConfirmPin] = useState('');
@@ -1436,6 +1459,9 @@
           )
       };
 
+    // ==========================================================
+    // 📱 12. DASHBOARD MAIN LAYOUT (โครงสร้างเมนู และ Sidebar)
+    // ==========================================================
     const DashboardLayout = ({ user, onLogout, backToAdmin, onUpdateRoomPin, showDialog, globalSettings }) => {
       const roomKey = `cf_${user.room}_`;
 
@@ -1491,8 +1517,8 @@
                       if(result.students && result.students.length > 0) setStudents(result.students);
                       if(result.records && result.records.length > 0) setRecords(result.records);
                       if(result.funds && result.funds.length > 0) setFunds(result.funds);
-                      if(result.health && Object.keys(result.health).length > 0) {
-                          setHealthRecords(Array.isArray(result.health) ? result.health : [result.health]);
+                      if(result.health && Array.isArray(result.health) && result.health.length > 0) {
+                          setHealthRecords(result.health);
                       }
                   }
               } catch(e) {
@@ -2134,11 +2160,124 @@
       );
     }
 
+    // ==========================================================
+    // 🚀 13. APP WRAPPER & BOOTSTRAP (จุดเชื่อมต่อหลัก)
+    // ==========================================================
+    function AppWrapper() {
+        const [globalSettings, setGlobalSettings] = useState(() => {
+            try { 
+                const saved = localStorage.getItem('cf_global_settings');
+                return saved ? JSON.parse(saved) : { schoolLogoUrl: '', zoneCheckUrl: '', adminPin: '123456' }; 
+            } catch(e) { return { schoolLogoUrl: '', zoneCheckUrl: '', adminPin: '123456' }; }
+        });
+
+        const [rooms, setRooms] = useState(() => {
+            try { 
+                const saved = localStorage.getItem('cf_global_rooms');
+                return saved ? JSON.parse(saved) : ['ม.1/1', 'ม.1/2', 'ม.2/1', 'ม.3/1', 'ม.4/1', 'ม.5/1', 'ม.6/1']; 
+            } catch(e) { return []; }
+        });
+
+        const [userSession, setUserSession] = useState(() => {
+            try { const saved = localStorage.getItem('cf_auth_session'); return saved ? JSON.parse(saved) : null; } 
+            catch(e) { return null; }
+        });
+
+        const [dialogConfig, setDialogConfig] = useState(null);
+
+        useEffect(() => {
+            const fetchGlobal = async () => {
+                if(!WEB_APP_URL) return;
+                try {
+                    const res = await fetch(`${WEB_APP_URL}?action=getGlobalSettings`);
+                    const result = await res.json();
+                    if(result.status === 'success' && result.data) {
+                        setGlobalSettings(result.data.settings || { schoolLogoUrl: '', zoneCheckUrl: '', adminPin: '123456' });
+                        if(result.data.rooms) setRooms(result.data.rooms);
+                    }
+                } catch(e) { console.error("โหลด Global Settings ไม่ได้"); }
+            };
+            fetchGlobal();
+        }, []);
+
+        useEffect(() => { localStorage.setItem('cf_global_settings', JSON.stringify(globalSettings)); }, [globalSettings]);
+        useEffect(() => { localStorage.setItem('cf_global_rooms', JSON.stringify(rooms)); }, [rooms]);
+
+        useEffect(() => {
+            const loader = document.getElementById('loading-screen');
+            if (loader) loader.style.display = 'none';
+        }, []);
+
+        const showDialog = (config) => setDialogConfig(config);
+        const closeDialog = () => setDialogConfig(null);
+
+        const handleLogin = (credentials, remember) => {
+            let isValid = false;
+            if(credentials.role === 'admin') {
+                if(credentials.pin === (globalSettings.adminPin || '123456')) isValid = true;
+            } else {
+                const roomPin = localStorage.getItem(`cf_${credentials.room}_pin`) || '0000';
+                if(credentials.pin === roomPin) isValid = true;
+            }
+
+            if(isValid) {
+                const session = { ...credentials, pin: credentials.pin };
+                if(remember) localStorage.setItem('cf_auth_session', JSON.stringify(session));
+                setUserSession(session);
+                window.showGlobalToast('เข้าสู่ระบบสำเร็จ', 'success');
+            } else {
+                showDialog({type: 'alert', title: 'รหัสผิดพลาด', message: 'รหัสความปลอดภัย (PIN) ไม่ถูกต้อง'});
+            }
+        };
+
+        const handleUpdateRoomPin = (room, newPin) => { localStorage.setItem(`cf_${room}_pin`, newPin); };
+
+        if (!userSession) {
+            return (
+                <React.Fragment>
+                    <LoginPage onLogin={handleLogin} availableRooms={rooms} savedSession={userSession} onClearSession={() => {localStorage.removeItem('cf_auth_session'); setUserSession(null);}} showDialog={showDialog} />
+                    <CustomDialog dialog={dialogConfig} closeDialog={closeDialog} />
+                </React.Fragment>
+            );
+        }
+
+        if (userSession.role === 'admin' && !userSession.room) {
+             return (
+                 <React.Fragment>
+                     <AdminDashboard 
+                         rooms={rooms} setRooms={(newRooms) => { setRooms(newRooms); syncToCloud('saveSettings', 'admin', { rooms: newRooms, settings: globalSettings }); }}
+                         enterRoom={(room) => setUserSession({...userSession, room: room})} 
+                         onLogout={() => {localStorage.removeItem('cf_auth_session'); setUserSession(null);}}
+                         showDialog={showDialog} globalSettings={globalSettings} setGlobalSettings={setGlobalSettings}
+                         onUpdateAdminPin={(pin) => {
+                             const newSettings = {...globalSettings, adminPin: pin};
+                             setGlobalSettings(newSettings);
+                             syncToCloud('saveSettings', 'admin', { rooms: rooms, settings: newSettings });
+                         }}
+                     />
+                     <CustomDialog dialog={dialogConfig} closeDialog={closeDialog} />
+                 </React.Fragment>
+             );
+        }
+
+        return (
+            <React.Fragment>
+                <DashboardLayout 
+                    user={userSession} 
+                    onLogout={() => {localStorage.removeItem('cf_auth_session'); setUserSession(null);}} 
+                    backToAdmin={userSession.role === 'admin' ? () => setUserSession({...userSession, room: null}) : null}
+                    onUpdateRoomPin={handleUpdateRoomPin}
+                    showDialog={showDialog}
+                    globalSettings={globalSettings}
+                />
+                <CustomDialog dialog={dialogConfig} closeDialog={closeDialog} />
+            </React.Fragment>
+        );
+    }
+
     const root = ReactDOM.createRoot(document.getElementById('root'));
     
-    // 🟢 ตัวจัดการแจ้งเตือน
     let globalSetToast = null;
-    let globalToastType = 'info';
 
     window.showGlobalToast = (msg, type = 'info') => {
        if(globalSetToast) {
