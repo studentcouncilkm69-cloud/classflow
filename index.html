@@ -24,10 +24,11 @@
       return false; 
     };
     window.addEventListener('unhandledrejection', function(event) {
-      window.onerror("API Error: " + (event.reason.message || "Unknown Rejection"), '', 0, 0, event.reason);
+      window.onerror("Unhandled Promise Rejection: " + (event.reason.message || "Unknown Rejection"), '', 0, 0, event.reason);
     });
   </script>
 
+  <!-- LIBRARIES -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;900&family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -41,6 +42,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <!-- 🟢 เพิ่ม Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <script>
     tailwind.config = {
@@ -57,25 +61,25 @@
     .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-    
     .a4-print-container { width: 794px !important; height: 1123px !important; padding: 30px 40px; box-sizing: border-box; background-color: white; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; page-break-after: always;}
     .pdf-header-title { font-size: 18px; font-weight: 700; color: #4c1d95; margin-bottom: 2px; font-family: 'Sarabun', sans-serif;}
     .pdf-header-subtitle { font-size: 13px; font-weight: 600; color: #4b5563; font-family: 'Sarabun', sans-serif; margin-bottom: 2px;}
-    
     .pdf-table { width: 100% !important; border-collapse: collapse; margin-top: 8px; font-family: 'Sarabun', sans-serif;}
     .pdf-table th { background-color: #6d28d9; color: white; font-weight: 700; font-size: 13px; padding: 4px; border: 1px solid #e9d5ff; text-align: center;}
     .pdf-table td { border: 1px solid #e9d5ff; vertical-align: middle; padding: 2px 6px; font-size: 12px; font-weight: 500; color: #334155; text-align: center;}
     .pdf-table td.text-left-pdf { text-align: left !important; padding-left: 12px !important;}
     
-    /* ถอด nth-child ออก ป้องกันบักการแสดงสีในโหมดขาวดำ ให้ React จัดการสีแทน */
+    /* โหมดพิมพ์ขาวดำ (บังคับสีลึกถึงระดับแท็ก) */
+    .pdf-mode-bw { background-color: #ffffff !important; }
+    .pdf-mode-bw * { color: #000000 !important; border-color: #000000 !important; }
+    .pdf-mode-bw .pdf-table th { background-color: #ffffff !important; color: #000000 !important; border: 1px solid #000000 !important; border-bottom: 2px solid #000000 !important; }
+    .pdf-mode-bw .pdf-table td { background-color: #ffffff !important; border: 1px solid #000000 !important; color: #000000 !important; }
+    
     .print-layer-hidden { display: none; }
     .print-layer-visible { display: block; position: absolute; top: 0; left: 0; z-index: -100; opacity: 0; pointer-events: none; }
-    
     .qr-grid-page { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(5, 1fr); gap: 15px; width: 100%; height: 100%; }
-    
     #qr-reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 2px dashed #cbd5e1; }
     #qr-reader video { object-fit: cover; }
-    
     .spinner { border: 4px solid rgba(109, 40, 217, 0.1); width: 50px; height: 50px; border-radius: 50%; border-left-color: #6d28d9; animation: spin 1s linear infinite; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .toast-enter { animation: slideInDown 0.3s ease-out forwards; }
@@ -94,8 +98,17 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef, Component } = React;
 
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz5GJb9i2Y4_DEzsgiKb_USD_ReL_5wnemwKtoA7Hj269JxRW_kCyDhaKWbIhTKgpc0/exec"; 
+    // ==========================================================
+    // ⚙️ 1. SUPABASE CONFIGURATION (เอาลิงก์จาก Supabase มาใส่ตรงนี้)
+    // ==========================================================
+    const SUPABASE_URL = "https://edjrjqyxxikbvyerwbji.supabase.co"; 
+    const SUPABASE_ANON_KEY = "Sb_publishable_QJAn4_3OJOtdDGCWQo-wlg_B2RPo1gH"; 
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // ==========================================================
+    // 🛠️ 2. UTILITIES & HELPERS
+    // ==========================================================
     class ErrorBoundary extends Component {
       constructor(props) { super(props); this.state = { hasError: false }; }
       static getDerivedStateFromError(error) { return { hasError: true }; }
@@ -165,15 +178,31 @@
 
     const isActive = (s) => !s.status || s.status === 'active';
 
+    // 🟢 ระบบบันทึกข้อมูลด้วย Supabase (แทนที่ fetch Google Script แบบเดิม)
     const syncToCloud = async (action, room, payload, callback) => {
-        if (!WEB_APP_URL) return;
         try {
-            const res = await fetch(WEB_APP_URL, { method: 'POST', body: JSON.stringify({ action, room, payload }) });
-            const result = await res.json();
-            if(result.status === 'error') throw new Error(result.message);
+            if (SUPABASE_URL === "YOUR_SUPABASE_URL") {
+                if(callback) callback(); return; 
+            }
+
+            // แปลง Action เดิมให้เป็น Type ของ Database
+            let typeStr = '';
+            if (action === 'saveSettings') typeStr = 'settings';
+            else if (action === 'saveStudents') typeStr = 'students';
+            else if (action === 'saveAttendance') typeStr = 'records';
+            else if (action === 'saveFunds') typeStr = 'funds';
+            else if (action === 'saveHealth') typeStr = 'health';
+
+            // บันทึก/อัปเดตข้อมูล (Upsert)
+            const { error } = await supabase
+                .from('classflow_data')
+                .upsert({ room: room, type: typeStr, payload: payload }, { onConflict: 'room, type' });
+
+            if (error) throw error;
             if(callback) callback();
         } catch(err) {
-            window.showGlobalToast(`ข้อผิดพลาดการซิงค์: ${err.message}`, 'error');
+            console.error("Sync Error:", err);
+            window.showGlobalToast(`DB Error: ${err.message}`, 'error');
             if(callback) callback();
         }
     };
@@ -181,13 +210,11 @@
     const CustomDialog = ({ dialog, closeDialog }) => {
         if (!dialog) return null;
         const [inputValue, setInputValue] = useState('');
-
         const handleConfirm = () => {
             if (dialog.type === 'prompt') dialog.onConfirm(inputValue);
             else if (dialog.onConfirm) dialog.onConfirm();
             closeDialog();
         };
-
         return (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[10000] flex items-center justify-center p-4 animate-in fade-in">
                 <div className="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl">
@@ -212,7 +239,6 @@
         );
     };
 
-    // ปุ่มสลับโหมด สี / ขาวดำ แบบใหม่ (เอาคำขยะออก)
     const PrintModeToggle = ({ pdfMode, setPdfMode }) => (
         <div className="flex items-center justify-end mb-3 gap-2">
             <span className="text-xs font-bold text-slate-500">โหมดพิมพ์:</span>
@@ -357,7 +383,7 @@
         const handleSaveGlobal = () => {
             setIsSaving(true);
             localStorage.setItem('cf_global_settings', JSON.stringify(globalSettings));
-            syncToCloud('saveSettings', 'admin', globalSettings, () => {
+            syncToCloud('saveSettings', 'admin', { rooms: rooms, settings: globalSettings }, () => {
                 window.showGlobalToast('บันทึกการตั้งค่าแล้ว', 'success');
                 setIsSaving(false);
             });
@@ -389,7 +415,7 @@
                             <div>
                                 <label className="block text-xs font-bold text-slate-600 mb-1">ลิงก์รูปโลโก้โรงเรียน (สำหรับหัว PDF)</label>
                                 <input type="text" value={globalSettings.schoolLogoUrl} onChange={(e)=>setGlobalSettings({...globalSettings, schoolLogoUrl: e.target.value})} placeholder="https://..." className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-[#6d28d9]" />
-                                <p className="text-[10px] text-slate-400 mt-1">อัปโหลดรูปขึ้นเว็บรับฝาก แล้วนำลิงก์ตรงมาวางที่นี่</p>
+                                <p className="text-[10px] text-slate-400 mt-1">นำลิงก์รูปมาวางที่นี่</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-600 mb-1">ลิงก์ ZoneCheck (ดูคะแนนเขต)</label>
@@ -1262,42 +1288,40 @@
              autoSyncCurrentState(latestStudents); 
          };
 
-         const handleImageUpload = (e, studentId) => {
+         // 🟢 อัปโหลดไฟล์รูปภาพตรงขึ้น Supabase Storage แบบ Public
+         const handleImageUpload = async (e, studentId) => {
             if(isAdmin) return;
             const file = e.target.files[0]; if(!file) return; playSound('tap');
-            
             setIsExporting('uploading');
             
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                const base64Raw = event.target.result;
-                
-                if (!WEB_APP_URL) {
-                    let latest = [];
-                    setStudents(prev => { latest = prev.map(s => s.id === studentId ? { ...s, image: base64Raw } : s); return latest; });
-                    setIsExporting('');
-                    showToast('อัปโหลดรูปลงเครื่องสำเร็จ', 'success');
-                    return;
-                }
+            try {
+                if (SUPABASE_URL === "YOUR_SUPABASE_URL") throw new Error("กรุณาใส่ Supabase URL ในโค้ดก่อนครับ");
 
-                try {
-                    const res = await fetch(WEB_APP_URL, {
-                        method: 'POST',
-                        body: JSON.stringify({ action: 'uploadImage', room: userRoom, payload: { base64: base64Raw, filename: `student_${studentId}.jpg` } })
-                    });
-                    const result = await res.json();
-                    if(result.status === 'error') throw new Error(result.message);
-                    
-                    const driveUrl = result.data.imageUrl;
-                    let latest = [];
-                    setStudents(prev => { latest = prev.map(s => s.id === studentId ? { ...s, image: driveUrl } : s); return latest; });
-                    autoSyncCurrentState(latest); 
-                } catch (err) {
-                    showToast(`อัปโหลดรูปไม่สำเร็จ: ${err.message}`, 'error');
-                }
-                setIsExporting('');
-            };
-            reader.readAsDataURL(file); 
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${userRoom}_${studentId}_${Date.now()}.${fileExt}`;
+
+                // Upload to Supabase Storage bucket 'classflow'
+                const { error: uploadError } = await supabase.storage
+                    .from('classflow')
+                    .upload(fileName, file, { cacheControl: '3600', upsert: true });
+
+                if (uploadError) throw uploadError;
+
+                // Get Public URL
+                const { data } = supabase.storage
+                    .from('classflow')
+                    .getPublicUrl(fileName);
+
+                const driveUrl = data.publicUrl;
+
+                let latest = [];
+                setStudents(prev => { latest = prev.map(s => s.id === studentId ? { ...s, image: driveUrl } : s); return latest; });
+                autoSyncCurrentState(latest); 
+                showToast('อัปโหลดรูปลง Supabase สำเร็จ!', 'success');
+            } catch (err) {
+                showToast(`อัปโหลดรูปไม่สำเร็จ: ${err.message}`, 'error');
+            }
+            setIsExporting('');
         };
 
          return (
@@ -1460,20 +1484,26 @@
       const [attPrintSettings, setAttPrintSettings] = useState({ show: false, filterType: 'all', selectedIds: [], activity: 'หน้าเสาธง' });
       const [searchPrint, setSearchPrint] = useState('');
 
+      // 🟢 ดึงข้อมูลตอนเปิดหน้า Dashboard จาก Supabase
       useEffect(() => {
           const loadDataFromCloud = async () => {
-              if(!WEB_APP_URL) return;
+              if(SUPABASE_URL === "YOUR_SUPABASE_URL") return;
               setIsExporting('loading_cloud'); 
               try {
-                  const res = await fetch(`${WEB_APP_URL}?action=getInitialData&room=${user.room}`);
-                  const result = await res.json();
-                  if(result.status === 'success') {
-                      if(result.students && result.students.length > 0) setStudents(result.students);
-                      if(result.records && result.records.length > 0) setRecords(result.records);
-                      if(result.funds && result.funds.length > 0) setFunds(result.funds);
-                      if(result.health && Array.isArray(result.health) && result.health.length > 0) {
-                          setHealthRecords(result.health);
-                      }
+                  const { data, error } = await supabase
+                      .from('classflow_data')
+                      .select('type, payload')
+                      .eq('room', user.room);
+                  
+                  if (error) throw error;
+                  
+                  if(data && data.length > 0) {
+                      data.forEach(item => {
+                          if(item.type === 'students') setStudents(item.payload || []);
+                          if(item.type === 'records') setRecords(item.payload || []);
+                          if(item.type === 'funds') setFunds(item.payload || []);
+                          if(item.type === 'health') setHealthRecords(item.payload || []);
+                      });
                   }
               } catch(e) {
                   showToast('ดึงข้อมูลจาก Cloud ล้มเหลว จะใช้ข้อมูลในเครื่องแทน', 'error');
@@ -1603,7 +1633,6 @@
               setIsExporting(containerId); window.scrollTo(0, 0); 
               setTimeout(async () => {
                   const element = document.getElementById(containerId);
-                  // 🟢 ลด Scale ลงเหลือ 2 ป้องกันเว็บค้าง/เด้ง ในมือถือ
                   const commonOpt = { scale: 2, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 794 };
                   
                   try {
@@ -1631,8 +1660,12 @@
               setTimeout(async () => {
                   if (type === 'pdf_qr_selected') {
                       const element = document.getElementById('pdf-qr-container');
-                      // 🟢 ลด Scale สำหรับ QR Code ลดการกินแรมมือถือแบบสุดๆ ป้องกันการเด้งหลุด
+                      // 🟢 ลด Scale PDF ของคิวอาร์โค้ดแก้แอปเด้งในมือถือ/ไอแพด
                       const commonOpt = { scale: 1.5, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 794 };
+                      
+                      // หน่วงเวลาพักหายใจนิดนึงกัน Crash
+                      await new Promise(r => setTimeout(r, 100));
+
                       await window.html2pdf().set({ 
                           margin: 0, 
                           filename: `บัตรนักเรียน_${settings?.roomName}.pdf`, 
@@ -1651,7 +1684,7 @@
                   }
                   setIsExporting(''); 
               }, 500);
-          } catch (error) { setIsExporting(''); showToast("เกิดข้อผิดพลาด", 'error'); }
+          } catch (error) { setIsExporting(''); showToast("เกิดข้อผิดพลาดในการดึงข้อมูล", 'error'); }
       };
 
       const exportExcel = (mode, dynamicParam = null) => {
@@ -1780,7 +1813,7 @@
           </main>
 
           {isExporting === 'loading_cloud' && <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center"><i className="fas fa-cloud-download-alt text-emerald-400 text-5xl mb-4 animate-bounce"></i><h2 className="text-sm font-bold text-white tracking-wide mt-2">กำลังดาวน์โหลดข้อมูลจากระบบ...</h2></div>}
-          {isExporting === 'uploading' && <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center"><i className="fas fa-cloud-upload-alt text-blue-400 text-5xl mb-4 animate-pulse"></i><h2 className="text-sm font-bold text-white tracking-wide mt-2">กำลังส่งรูปภาพขนาดเต็ม...</h2><p className="text-[10px] text-slate-300 mt-1">อาจใช้เวลาสักครู่ ขึ้นอยู่กับขนาดไฟล์</p></div>}
+          {isExporting === 'uploading' && <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center"><i className="fas fa-cloud-upload-alt text-blue-400 text-5xl mb-4 animate-pulse"></i><h2 className="text-sm font-bold text-white tracking-wide mt-2">กำลังส่งรูปภาพขนาดเต็ม...</h2><p className="text-[10px] text-slate-300 mt-1">อัปโหลดไปยัง Supabase Storage</p></div>}
           {(isExporting && isExporting !== 'loading_cloud' && isExporting !== 'uploading') && <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center"><i className="fas fa-circle-notch fa-spin text-[#6d28d9] text-4xl mb-4 bg-white p-3 rounded-full shadow-lg"></i><h2 className="text-sm font-bold text-white tracking-wide mt-2">กำลังสร้างเอกสาร PDF...</h2><p className="text-[10px] text-slate-300 mt-1">กรุณารอสักครู่ ห้ามปิดหน้าจอ</p></div>}
 
           {attPrintSettings.show && (
@@ -1842,10 +1875,32 @@
               </div>
           )}
 
-          {/* 🟢 อัปเดตโครงสร้าง PDF ให้บังคับใช้ React Style (inline) เพื่อให้ขาวดำสนิท 100% */}
-          <div className={`${isExporting ? "print-layer-visible" : "print-layer-hidden"}`}>
-               
-               {/* 1. PDF เช็คชื่อ */}
+          {selectedQRStudent && (
+            <div className="fixed inset-0 z-[900] bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-in fade-in">
+                <div id="single-qr-card-content" className="w-[350px] h-[220px] bg-white border-2 border-slate-300 rounded-[12px] overflow-hidden relative shadow-2xl shrink-0 font-sarabun">
+                    <div className="absolute top-0 left-0 w-[125px] h-full bg-slate-50 border-r-2 border-slate-200">
+                        <div className="absolute top-[20px] left-[17px] w-[90px] h-[115px] bg-white border border-slate-300 rounded-md overflow-hidden flex items-center justify-center shadow-sm">
+                            {selectedQRStudent.image ? <img src={selectedQRStudent.image} className="w-full h-full object-cover" crossOrigin="anonymous" /> : <i className="fas fa-user text-slate-300 text-4xl"></i>}
+                        </div>
+                        <div className="absolute bottom-0 left-0 w-full bg-[#6d28d9] text-white text-[13px] font-bold text-center py-2">เลขที่ {selectedQRStudent.number || ''}</div>
+                    </div>
+                    <div className="absolute top-0 left-[125px] w-[225px] h-full p-4 flex flex-col">
+                        <div className="mb-2">
+                            <div className="font-bold text-slate-800 text-[16px] leading-[1.6] max-h-[50px] overflow-hidden break-words mb-1">{selectedQRStudent.name || ''}</div>
+                            <div className="text-slate-500 font-bold text-[12px] leading-[1.4]">รหัส: {selectedQRStudent.code || selectedQRStudent.id}</div>
+                            <div className="text-[#6d28d9] font-bold text-[12px] leading-[1.4]">ห้อง: {settings?.roomName}</div>
+                        </div>
+                        <div className="absolute bottom-4 right-4 border-2 border-slate-200 p-1.5 rounded-lg bg-white shadow-sm"><QRCodeCanvas text={selectedQRStudent.code || selectedQRStudent.id} size={75} /></div>
+                    </div>
+                    <button onClick={() => setSelectedQRStudent(null)} className="absolute top-2 right-2 w-7 h-7 bg-slate-100/80 hover:bg-slate-200 text-slate-600 rounded-full flex items-center justify-center transition-colors z-10" data-html2canvas-ignore><i className="fas fa-times"></i></button>
+                </div>
+                <button onClick={() => executeExport('pdf_single_qr')} className="mt-4 bg-[#6d28d9] text-white px-6 py-2.5 rounded-xl font-bold shadow-md text-xs hover:bg-[#5b21b6]"><i className="fas fa-download mr-1"></i> บันทึกรูปภาพ</button>
+            </div>
+          )}
+
+          {/* 🟢 ส่วนปริ้น PDF ที่ตั้งค่าขาวดำ */}
+          <div className={`${isExporting ? "print-layer-visible" : "print-layer-hidden"} ${pdfMode === 'bw' ? 'pdf-mode-bw' : ''}`}>
+               {/* PDF เช็คชื่อหน้าเสาธง */}
                <div id="pdf-report-container">
                    {attendancePrintChunks.map((chunk, index) => {
                        const gTitle = chunk.find(r=>r.isHeader)?.title;
@@ -2012,7 +2067,7 @@
                    )})}
                </div>
 
-               {/* 🟢 4. PDF รายชื่อนักเรียน (เอา 3 ช่องกลับมาให้แล้ว) */}
+               {/* 🟢 4. PDF รายชื่อนักเรียน (มีช่องว่าง 3 ช่องให้ครูติ๊กชื่อ) */}
                <div id="pdf-students-container">
                    {pdfPrintChunks.map((chunk, index) => {
                        const gTitle = chunk.find(r=>r.isHeader)?.title;
@@ -2115,15 +2170,21 @@
 
         const [dialogConfig, setDialogConfig] = useState(null);
 
+        // 🟢 ดึงข้อมูล Global Setting จาก Supabase
         useEffect(() => {
             const fetchGlobal = async () => {
-                if(!WEB_APP_URL) return;
+                if(SUPABASE_URL === "YOUR_SUPABASE_URL") return;
                 try {
-                    const res = await fetch(`${WEB_APP_URL}?action=getGlobalSettings`);
-                    const result = await res.json();
-                    if(result.status === 'success' && result.data) {
-                        setGlobalSettings(result.data.settings || { schoolLogoUrl: '', zoneCheckUrl: '', adminPin: '123456' });
-                        if(result.data.rooms) setRooms(result.data.rooms);
+                    const { data, error } = await supabase
+                        .from('classflow_data')
+                        .select('payload')
+                        .eq('room', 'admin')
+                        .eq('type', 'settings')
+                        .single();
+                    
+                    if (data && data.payload) {
+                        setGlobalSettings(data.payload.settings || { schoolLogoUrl: '', zoneCheckUrl: '', adminPin: '123456' });
+                        if(data.payload.rooms) setRooms(data.payload.rooms);
                     }
                 } catch(e) { console.error("โหลด Global Settings ไม่ได้"); }
             };
