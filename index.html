@@ -43,7 +43,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <!-- 🟢 เพิ่ม Supabase JS SDK -->
+  <!-- SUPABASE JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <script>
@@ -69,11 +69,11 @@
     .pdf-table td { border: 1px solid #e9d5ff; vertical-align: middle; padding: 2px 6px; font-size: 12px; font-weight: 500; color: #334155; text-align: center;}
     .pdf-table td.text-left-pdf { text-align: left !important; padding-left: 12px !important;}
     
-    /* โหมดพิมพ์ขาวดำ (บังคับสีลึกถึงระดับแท็ก) */
+    /* โหมดพิมพ์ขาวดำ ปรับให้อ่อนลงเป็นเทาเข้มเพื่อความสวยงาม */
     .pdf-mode-bw { background-color: #ffffff !important; }
-    .pdf-mode-bw * { color: #000000 !important; border-color: #000000 !important; }
-    .pdf-mode-bw .pdf-table th { background-color: #ffffff !important; color: #000000 !important; border: 1px solid #000000 !important; border-bottom: 2px solid #000000 !important; }
-    .pdf-mode-bw .pdf-table td { background-color: #ffffff !important; border: 1px solid #000000 !important; color: #000000 !important; }
+    .pdf-mode-bw * { color: #1e293b !important; border-color: #94a3b8 !important; }
+    .pdf-mode-bw .pdf-table th { background-color: #ffffff !important; color: #1e293b !important; border: 1px solid #94a3b8 !important; border-bottom: 2px solid #64748b !important; }
+    .pdf-mode-bw .pdf-table td { background-color: #ffffff !important; border: 1px solid #94a3b8 !important; color: #1e293b !important; }
     
     .print-layer-hidden { display: none; }
     .print-layer-visible { display: block; position: absolute; top: 0; left: 0; z-index: -100; opacity: 0; pointer-events: none; }
@@ -99,7 +99,7 @@
     const { useState, useEffect, useMemo, useRef, Component } = React;
 
     // ==========================================================
-    // ⚙️ 1. SUPABASE CONFIGURATION (เอาลิงก์จาก Supabase มาใส่ตรงนี้)
+    // ⚙️ 1. SUPABASE CONFIGURATION (เอาลิงก์และ Key จาก Supabase มาใส่ 2 บรรทัดนี้)
     // ==========================================================
     const SUPABASE_URL = "https://edjrjqyxxikbvyerwbji.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_QJAn4_3OJOtdDGCWQo-wlg_B2RPo1gH"; 
@@ -178,14 +178,13 @@
 
     const isActive = (s) => !s.status || s.status === 'active';
 
-    // 🟢 ระบบบันทึกข้อมูลด้วย Supabase (แทนที่ fetch Google Script แบบเดิม)
+    // 🟢 ระบบบันทึกข้อมูลด้วย Supabase (มีแจ้งเตือน Error ชัดเจน)
     const syncToCloud = async (action, room, payload, callback) => {
         try {
             if (SUPABASE_URL === "YOUR_SUPABASE_URL") {
                 if(callback) callback(); return; 
             }
 
-            // แปลง Action เดิมให้เป็น Type ของ Database
             let typeStr = '';
             if (action === 'saveSettings') typeStr = 'settings';
             else if (action === 'saveStudents') typeStr = 'students';
@@ -198,11 +197,14 @@
                 .from('classflow_data')
                 .upsert({ room: room, type: typeStr, payload: payload }, { onConflict: 'room, type' });
 
-            if (error) throw error;
+            if (error) {
+                console.error("Supabase Error Detail:", error);
+                throw new Error(error.message);
+            }
             if(callback) callback();
         } catch(err) {
             console.error("Sync Error:", err);
-            window.showGlobalToast(`DB Error: ${err.message}`, 'error');
+            window.showGlobalToast(`บันทึกข้อมูลไม่สำเร็จ: ${err.message}`, 'error');
             if(callback) callback();
         }
     };
@@ -249,7 +251,7 @@
 
     const LoginPage = ({ onLogin, availableRooms, savedSession, onClearSession, showDialog }) => {
       const [role, setRole] = useState('head'); 
-      const [room, setRoom] = useState(availableRooms[0] || 'ม.1/1');
+      const [room, setRoom] = useState(availableRooms[0] || '');
       const [pin, setPin] = useState('');
       const [rememberMe, setRememberMe] = useState(false);
 
@@ -275,7 +277,8 @@
             if(pin) onLogin({ role: 'admin', room: null, pin: pin }, rememberMe);
             else showDialog({type: 'alert', title: 'แจ้งเตือน', message: 'กรุณาใส่รหัสผ่านแอดมิน'});
         } else {
-            if (pin) onLogin({ role: 'head', room, pin: pin }, rememberMe);
+            if (!room) showDialog({type: 'alert', title: 'แจ้งเตือน', message: 'ไม่พบห้องเรียน กรุณาติดต่อแอดมินเพื่อเพิ่มห้องในระบบ'});
+            else if (pin) onLogin({ role: 'head', room, pin: pin }, rememberMe);
             else showDialog({type: 'alert', title: 'แจ้งเตือน', message: 'กรุณาใส่รหัส PIN ห้อง'});
         }
       };
@@ -327,9 +330,15 @@
                       {role === 'head' && (
                         <div>
                           <label className="block text-xs font-bold text-slate-700 mb-1">เลือกห้องเรียน</label>
-                          <select value={room} onChange={(e) => setRoom(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:border-[#6d28d9] outline-none transition-colors cursor-pointer">
-                            {availableRooms.map(r => <option key={r} value={r}>{r}</option>)}
-                          </select>
+                          {availableRooms.length === 0 ? (
+                              <div className="w-full px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-600 font-bold text-sm text-center">
+                                  ยังไม่มีห้องเรียน กรุณาให้แอดมินเพิ่มก่อน
+                              </div>
+                          ) : (
+                              <select value={room} onChange={(e) => setRoom(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:border-[#6d28d9] outline-none transition-colors cursor-pointer">
+                                {availableRooms.map(r => <option key={r} value={r}>{r}</option>)}
+                              </select>
+                          )}
                         </div>
                       )}
                       <div>
@@ -343,7 +352,7 @@
                         <label htmlFor="rememberMeDesktop" className="ml-2 text-xs font-bold text-slate-500 cursor-pointer">จดจำการเข้าสู่ระบบไว้ในเครื่องนี้</label>
                     </div>
 
-                    <button type="submit" className={`w-full py-4 rounded-xl text-white font-bold shadow-lg transition-all active:scale-95 relative z-30 ${role === 'admin' ? 'bg-amber-500' : 'bg-[#6d28d9]'}`}>เข้าสู่ระบบ</button>
+                    <button type="submit" disabled={role === 'head' && availableRooms.length === 0} className={`w-full py-4 rounded-xl text-white font-bold shadow-lg transition-all active:scale-95 relative z-30 ${role === 'admin' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-[#6d28d9] hover:bg-[#5b21b6]'} ${(role === 'head' && availableRooms.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}>เข้าสู่ระบบ</button>
                   </form>
                 </div>
               </div>
@@ -1660,10 +1669,8 @@
               setTimeout(async () => {
                   if (type === 'pdf_qr_selected') {
                       const element = document.getElementById('pdf-qr-container');
-                      // 🟢 ลด Scale PDF ของคิวอาร์โค้ดแก้แอปเด้งในมือถือ/ไอแพด
                       const commonOpt = { scale: 1.5, useCORS: true, letterRendering: true, scrollY: 0, windowWidth: 794 };
                       
-                      // หน่วงเวลาพักหายใจนิดนึงกัน Crash
                       await new Promise(r => setTimeout(r, 100));
 
                       await window.html2pdf().set({ 
@@ -1813,7 +1820,7 @@
           </main>
 
           {isExporting === 'loading_cloud' && <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center"><i className="fas fa-cloud-download-alt text-emerald-400 text-5xl mb-4 animate-bounce"></i><h2 className="text-sm font-bold text-white tracking-wide mt-2">กำลังดาวน์โหลดข้อมูลจากระบบ...</h2></div>}
-          {isExporting === 'uploading' && <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center"><i className="fas fa-cloud-upload-alt text-blue-400 text-5xl mb-4 animate-pulse"></i><h2 className="text-sm font-bold text-white tracking-wide mt-2">กำลังส่งรูปภาพขนาดเต็ม...</h2><p className="text-[10px] text-slate-300 mt-1">อัปโหลดไปยัง Supabase Storage</p></div>}
+          {isExporting === 'uploading' && <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center"><i className="fas fa-image text-blue-400 text-5xl mb-4 animate-pulse"></i><h2 className="text-sm font-bold text-white tracking-wide mt-2">กำลังอัปโหลดรูปภาพ...</h2><p className="text-[10px] text-slate-300 mt-1">บันทึกรูปไปยังฐานข้อมูลกลาง</p></div>}
           {(isExporting && isExporting !== 'loading_cloud' && isExporting !== 'uploading') && <div className="fixed inset-0 z-[999] bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center"><i className="fas fa-circle-notch fa-spin text-[#6d28d9] text-4xl mb-4 bg-white p-3 rounded-full shadow-lg"></i><h2 className="text-sm font-bold text-white tracking-wide mt-2">กำลังสร้างเอกสาร PDF...</h2><p className="text-[10px] text-slate-300 mt-1">กรุณารอสักครู่ ห้ามปิดหน้าจอ</p></div>}
 
           {attPrintSettings.show && (
@@ -1910,21 +1917,21 @@
                            <div style={{ flexShrink: 0, paddingBottom: '10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                {globalSettings?.schoolLogoUrl && <img src={globalSettings.schoolLogoUrl} style={{ height: '40px', width: 'auto', objectFit: 'contain', filter: pdfMode === 'bw' ? 'grayscale(100%)' : 'none' }} crossOrigin="anonymous" />}
                                <div>
-                                   <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#000' : '#4c1d95' }}>รายงานเช็คชื่อ: {attPrintSettings.activity || 'หน้าเสาธง'} ห้อง {settings?.roomName}{groupText}</h1>
-                                   <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#000' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
+                                   <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#1e293b' : '#4c1d95' }}>รายงานเช็คชื่อ: {attPrintSettings.activity || 'หน้าเสาธง'} ห้อง {settings?.roomName}{groupText}</h1>
+                                   <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#475569' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
                                </div>
                                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                                   <p style={{ margin: '0', color: pdfMode === 'bw' ? '#000' : '#4b5563', fontSize: '12px', fontWeight: 'bold' }}>ประจำวันที่: {formatThaiDate(currentDate)}</p>
+                                   <p style={{ margin: '0', color: pdfMode === 'bw' ? '#475569' : '#4b5563', fontSize: '12px', fontWeight: 'bold' }}>ประจำวันที่: {formatThaiDate(currentDate)}</p>
                                </div>
                            </div>
                            <table className="pdf-table" style={{ width: '100%' }}>
                                  <thead>
                                      <tr>
-                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขที่</th>
-                                         <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขประจำตัว</th>
-                                         <th style={{width: '37%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>ชื่อ - สกุล</th>
-                                         <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>สถานะ</th>
-                                         <th style={{width: '30%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>หมายเหตุ</th>
+                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขที่</th>
+                                         <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขประจำตัว</th>
+                                         <th style={{width: '37%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ชื่อ - สกุล</th>
+                                         <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>สถานะ</th>
+                                         <th style={{width: '30%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>หมายเหตุ</th>
                                      </tr>
                                  </thead>
                                  <tbody>
@@ -1942,11 +1949,11 @@
                                            if (st === 'present') { label = '✓'; textColor = '#10b981'; } else if (st === 'absent') { label = 'ข'; textColor = '#ef4444'; } else if (st === 'excused') { label = 'ล'; textColor = '#3b82f6'; } 
                                         }
                                         return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
-                                           <td style={{ color: pdfMode === 'bw' ? '#000' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#000' : '#64748b' }}>{s.code || s.id}</td>
-                                           <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#000' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
-                                           <td style={{ fontWeight: '900', fontSize: '14px', color: pdfMode === 'bw' ? '#000' : textColor }}>{label}</td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#000' : (!active ? '#ef4444' : '#64748b'), fontSize: '10px', fontWeight: !active ? 'bold' : 'normal' }}>
+                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#64748b' }}>{s.code || s.id}</td>
+                                           <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#1e293b' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
+                                           <td style={{ fontWeight: '900', fontSize: '14px', color: pdfMode === 'bw' ? '#1e293b' : textColor }}>{label}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#475569' : (!active ? '#ef4444' : '#64748b'), fontSize: '10px', fontWeight: !active ? 'bold' : 'normal' }}>
                                                {active ? (noteData[s.id] || '') : stText}
                                            </td>
                                         </tr>
@@ -1968,19 +1975,19 @@
                                <div style={{ flexShrink: 0, paddingBottom: '10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                    {globalSettings?.schoolLogoUrl && <img src={globalSettings.schoolLogoUrl} style={{ height: '40px', width: 'auto', objectFit: 'contain', filter: pdfMode === 'bw' ? 'grayscale(100%)' : 'none' }} crossOrigin="anonymous" />}
                                    <div>
-                                       <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#000' : '#4c1d95' }}>รายงานการเก็บเงิน: {activeF.title || ''} ห้อง {settings?.roomName}{groupText}</h1>
-                                       <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#000' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
+                                       <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#1e293b' : '#4c1d95' }}>รายงานการเก็บเงิน: {activeF.title || ''} ห้อง {settings?.roomName}{groupText}</h1>
+                                       <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#475569' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
                                    </div>
                                </div>
                                <table className="pdf-table" style={{ width: '100%' }}>
                                      <thead>
                                          <tr>
-                                             <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขที่</th>
-                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขประจำตัว</th>
-                                             <th style={{width: '32%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>ชื่อ - สกุล</th>
-                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>ยอดจ่าย</th>
-                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>สถานะ</th>
-                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>หมายเหตุ</th>
+                                             <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขที่</th>
+                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขประจำตัว</th>
+                                             <th style={{width: '32%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ชื่อ - สกุล</th>
+                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ยอดจ่าย</th>
+                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>สถานะ</th>
+                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>หมายเหตุ</th>
                                          </tr>
                                      </thead>
                                      <tbody>
@@ -1995,15 +2002,15 @@
                                              const target = parseFloat(activeF.amount) || 0;
                                              const isFull = paid >= target;
                                              const methodText = method === 'transfer' ? '(โอน)' : '(สด)';
-                                             const methodColor = pdfMode === 'bw' ? '#000' : (method === 'transfer' ? '#3b82f6' : '#64748b');
+                                             const methodColor = pdfMode === 'bw' ? '#475569' : (method === 'transfer' ? '#3b82f6' : '#64748b');
 
                                              return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
-                                                <td style={{ color: pdfMode === 'bw' ? '#000' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
-                                                <td style={{ color: pdfMode === 'bw' ? '#000' : '#64748b' }}>{s.code || s.id}</td>
-                                                <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#000' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
-                                                <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#000' : 'inherit' }}>{!active ? '-' : `${paid} / ${target}`} {active && <span style={{fontSize:'9px', color: methodColor, marginLeft:'4px'}}>{methodText}</span>}</td>
-                                                <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#000' : (!active ? '#94a3b8' : (isFull ? '#10b981' : '#ef4444')) }}>{!active ? '-' : (isFull ? 'จ่ายครบ' : 'ค้างจ่าย')}</td>
-                                                <td style={{ color: pdfMode === 'bw' ? '#000' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
+                                                <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
+                                                <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#64748b' }}>{s.code || s.id}</td>
+                                                <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#1e293b' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
+                                                <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#1e293b' : 'inherit' }}>{!active ? '-' : `${paid} / ${target}`} {active && <span style={{fontSize:'9px', color: methodColor, marginLeft:'4px'}}>{methodText}</span>}</td>
+                                                <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#1e293b' : (!active ? '#94a3b8' : (isFull ? '#10b981' : '#ef4444')) }}>{!active ? '-' : (isFull ? 'จ่ายครบ' : 'ค้างจ่าย')}</td>
+                                                <td style={{ color: pdfMode === 'bw' ? '#475569' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
                                              </tr>
                                          })}
                                      </tbody>
@@ -2026,23 +2033,23 @@
                            <div style={{ flexShrink: 0, paddingBottom: '10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                {globalSettings?.schoolLogoUrl && <img src={globalSettings.schoolLogoUrl} style={{ height: '40px', width: 'auto', objectFit: 'contain', filter: pdfMode === 'bw' ? 'grayscale(100%)' : 'none' }} crossOrigin="anonymous" />}
                                <div>
-                                   <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#000' : '#4c1d95' }}>รายงานข้อมูลสุขภาพ (BMI) ห้อง {settings?.roomName}{groupText}</h1>
-                                   <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#000' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
+                                   <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#1e293b' : '#4c1d95' }}>รายงานข้อมูลสุขภาพ (BMI) ห้อง {settings?.roomName}{groupText}</h1>
+                                   <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#475569' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
                                </div>
                                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                                   <p style={{ margin: '0', color: pdfMode === 'bw' ? '#000' : '#4b5563', fontSize: '12px', fontWeight: 'bold' }}>ประจำเดือน {currentHealthDate}</p>
+                                   <p style={{ margin: '0', color: pdfMode === 'bw' ? '#475569' : '#4b5563', fontSize: '12px', fontWeight: 'bold' }}>ประจำเดือน {currentHealthDate}</p>
                                </div>
                            </div>
                            <table className="pdf-table" style={{ width: '100%' }}>
                                  <thead>
                                      <tr>
-                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขที่</th>
-                                         <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขประจำตัว</th>
-                                         <th style={{width: '32%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>ชื่อ - สกุล</th>
-                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>นน.</th>
-                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>สส.</th>
-                                         <th style={{width: '14%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>ประเมิน</th>
-                                         <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>หมายเหตุ</th>
+                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขที่</th>
+                                         <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขประจำตัว</th>
+                                         <th style={{width: '32%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ชื่อ - สกุล</th>
+                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>นน.</th>
+                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>สส.</th>
+                                         <th style={{width: '14%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ประเมิน</th>
+                                         <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>หมายเหตุ</th>
                                      </tr>
                                  </thead>
                                  <tbody>
@@ -2052,13 +2059,13 @@
                                         const stText = !active ? (s.status === 'moved' ? 'ย้าย' : 'ไม่มีตัวตน') : '';
                                         const hData = hDataMap[s.id] || {w:'', h:''}; const bmiData = calculateBMI(hData.w, hData.h, s.name);
                                         return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
-                                           <td style={{ color: pdfMode === 'bw' ? '#000' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#000' : '#64748b' }}>{s.code || s.id}</td>
-                                           <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#000' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#000' : 'inherit' }}>{!active ? '-' : (hData.w || '-')}</td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#000' : 'inherit' }}>{!active ? '-' : (hData.h || '-')}</td>
-                                           <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#000' : (!active ? '#94a3b8' : '#334155') }}>{!active ? '-' : (bmiData.bmi > 0 ? `${bmiData.bmi} (${bmiData.label})` : '-')}</td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#000' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#64748b' }}>{s.code || s.id}</td>
+                                           <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#1e293b' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : 'inherit' }}>{!active ? '-' : (hData.w || '-')}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : 'inherit' }}>{!active ? '-' : (hData.h || '-')}</td>
+                                           <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#1e293b' : (!active ? '#94a3b8' : '#334155') }}>{!active ? '-' : (bmiData.bmi > 0 ? `${bmiData.bmi} (${bmiData.label})` : '-')}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#475569' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
                                         </tr>
                                      })}
                                  </tbody>
@@ -2067,7 +2074,7 @@
                    )})}
                </div>
 
-               {/* 🟢 4. PDF รายชื่อนักเรียน (มีช่องว่าง 3 ช่องให้ครูติ๊กชื่อ) */}
+               {/* 4. PDF รายชื่อนักเรียน */}
                <div id="pdf-students-container">
                    {pdfPrintChunks.map((chunk, index) => {
                        const gTitle = chunk.find(r=>r.isHeader)?.title;
@@ -2077,20 +2084,20 @@
                             <div style={{ flexShrink: 0, paddingBottom: '10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 {globalSettings?.schoolLogoUrl && <img src={globalSettings.schoolLogoUrl} style={{ height: '40px', width: 'auto', objectFit: 'contain', filter: pdfMode === 'bw' ? 'grayscale(100%)' : 'none' }} crossOrigin="anonymous" />}
                                 <div>
-                                    <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#000' : '#4c1d95' }}>รายชื่อนักเรียน ห้อง {settings?.roomName}{groupText}</h1>
-                                    <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#000' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
+                                    <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#1e293b' : '#4c1d95' }}>รายชื่อนักเรียน ห้อง {settings?.roomName}{groupText}</h1>
+                                    <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#475569' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
                                 </div>
                             </div>
                             <table className="pdf-table" style={{ width: '100%' }}>
                                   <thead>
                                     <tr>
-                                        <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขที่</th>
-                                        <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>เลขประจำตัว</th>
-                                        <th style={{width: '32%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>ชื่อ - สกุล</th>
+                                        <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขที่</th>
+                                        <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขประจำตัว</th>
+                                        <th style={{width: '32%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ชื่อ - สกุล</th>
                                         <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9'}}></th>
                                         <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9'}}></th>
                                         <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9'}}></th>
-                                        <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white'}}>หมายเหตุ</th>
+                                        <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>หมายเหตุ</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -2099,11 +2106,11 @@
                                          const active = isActive(s);
                                          const stText = !active ? (s.status === 'moved' ? 'ย้าย' : 'ไม่มีตัวตน') : '';
                                          return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
-                                            <td style={{ color: pdfMode === 'bw' ? '#000' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
-                                            <td style={{ color: pdfMode === 'bw' ? '#000' : '#64748b' }}>{s.code || s.id}</td>
-                                            <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#000' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
+                                            <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
+                                            <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#64748b' }}>{s.code || s.id}</td>
+                                            <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#1e293b' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
                                             <td></td><td></td><td></td>
-                                            <td style={{ color: pdfMode === 'bw' ? '#000' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
+                                            <td style={{ color: pdfMode === 'bw' ? '#475569' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
                                          </tr>
                                       })}
                                   </tbody>
@@ -2112,27 +2119,27 @@
                    )})}
                </div>
                
-               {/* 5. PDF บัตร QR (ลด Scale การกินแร็ม ป้องกันเด้ง) */}
+               {/* 5. PDF บัตร QR */}
                <div id="pdf-qr-container">
                     {qrCodeChunks.map((pageStudents, pageIndex) => (
                         <div key={pageIndex} className="a4-print-container font-sarabun" style={{ padding: '40px' }}>
                              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                                 <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#000' : '#4c1d95' }}>บัตรประจำตัวนักเรียน ห้อง {settings?.roomName}</h1>
+                                 <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#1e293b' : '#4c1d95' }}>บัตรประจำตัวนักเรียน ห้อง {settings?.roomName}</h1>
                              </div>
                              <div className="qr-grid-page">
                                  {pageStudents.map(s => (
-                                     <div key={s.id} style={{ border: pdfMode === 'bw' ? '2px solid #000' : '2px solid #cbd5e1', borderRadius: '12px', display: 'flex', overflow: 'hidden', height: '100%', position: 'relative' }}>
-                                         <div style={{ width: '110px', backgroundColor: pdfMode === 'bw' ? '#fff' : '#f8fafc', borderRight: pdfMode === 'bw' ? '1px solid #000' : '1px solid #e2e8f0', position: 'relative' }}>
-                                             <div style={{ position: 'absolute', top: '15px', left: '15px', width: '80px', height: '100px', backgroundColor: 'white', border: pdfMode === 'bw' ? '1px solid #000' : '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                 {s.image ? <img src={s.image} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: pdfMode === 'bw' ? 'grayscale(100%)' : 'none' }} /> : <i className="fas fa-user" style={{ color: pdfMode === 'bw' ? '#000' : '#cbd5e1', fontSize: '30px' }}></i>}
+                                     <div key={s.id} style={{ border: pdfMode === 'bw' ? '2px solid #94a3b8' : '2px solid #cbd5e1', borderRadius: '12px', display: 'flex', overflow: 'hidden', height: '100%', position: 'relative' }}>
+                                         <div style={{ width: '110px', backgroundColor: pdfMode === 'bw' ? '#fff' : '#f8fafc', borderRight: pdfMode === 'bw' ? '1px solid #94a3b8' : '1px solid #e2e8f0', position: 'relative' }}>
+                                             <div style={{ position: 'absolute', top: '15px', left: '15px', width: '80px', height: '100px', backgroundColor: 'white', border: pdfMode === 'bw' ? '1px solid #94a3b8' : '1px solid #cbd5e1', borderRadius: '6px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                 {s.image ? <img src={s.image} style={{ width: '100%', height: '100%', objectFit: 'cover', filter: pdfMode === 'bw' ? 'grayscale(100%)' : 'none' }} /> : <i className="fas fa-user" style={{ color: pdfMode === 'bw' ? '#94a3b8' : '#cbd5e1', fontSize: '30px' }}></i>}
                                              </div>
-                                             <div style={{ position: 'absolute', bottom: '0', width: '100%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#000' : 'white', borderTop: pdfMode === 'bw' ? '1px solid #000' : 'none', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', padding: '4px 0' }}>เลขที่ {s.number}</div>
+                                             <div style={{ position: 'absolute', bottom: '0', width: '100%', backgroundColor: pdfMode === 'bw' ? '#f1f5f9' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white', borderTop: pdfMode === 'bw' ? '1px solid #94a3b8' : 'none', textAlign: 'center', fontSize: '12px', fontWeight: 'bold', padding: '4px 0' }}>เลขที่ {s.number}</div>
                                          </div>
                                          <div style={{ flex: 1, padding: '15px', display: 'flex', flexDirection: 'column' }}>
                                              <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#1e293b', marginBottom: '2px', textDecoration: !isActive(s) ? 'line-through' : 'none' }}>{s.name || ''}</div>
-                                             <div style={{ color: pdfMode === 'bw' ? '#000' : '#64748b', fontSize: '11px', fontWeight: 'bold' }}>รหัส: {s.code || s.id}</div>
-                                             <div style={{ color: pdfMode === 'bw' ? '#000' : '#6d28d9', fontSize: '11px', fontWeight: 'bold' }}>ห้อง: {settings?.roomName}</div>
-                                             <div style={{ marginTop: 'auto', alignSelf: 'flex-end', border: pdfMode === 'bw' ? '1px solid #000' : '1px solid #cbd5e1', padding: '4px', borderRadius: '6px', backgroundColor: 'white' }}>
+                                             <div style={{ color: pdfMode === 'bw' ? '#1e293b' : '#64748b', fontSize: '11px', fontWeight: 'bold' }}>รหัส: {s.code || s.id}</div>
+                                             <div style={{ color: pdfMode === 'bw' ? '#1e293b' : '#6d28d9', fontSize: '11px', fontWeight: 'bold' }}>ห้อง: {settings?.roomName}</div>
+                                             <div style={{ marginTop: 'auto', alignSelf: 'flex-end', border: pdfMode === 'bw' ? '1px solid #94a3b8' : '1px solid #cbd5e1', padding: '4px', borderRadius: '6px', backgroundColor: 'white' }}>
                                                  <QRCodeCanvas text={s.code || s.id} size={65} />
                                              </div>
                                          </div>
@@ -2159,7 +2166,7 @@
         const [rooms, setRooms] = useState(() => {
             try { 
                 const saved = localStorage.getItem('cf_global_rooms');
-                return saved ? JSON.parse(saved) : ['ม.1/1', 'ม.1/2', 'ม.2/1', 'ม.3/1', 'ม.4/1', 'ม.5/1', 'ม.6/1']; 
+                return saved ? JSON.parse(saved) : []; 
             } catch(e) { return []; }
         });
 
