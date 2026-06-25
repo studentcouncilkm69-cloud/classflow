@@ -28,7 +28,6 @@
     });
   </script>
 
-  <!-- LIBRARIES -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;900&family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -43,7 +42,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <!-- SUPABASE JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <script>
@@ -61,6 +59,8 @@
     .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
     .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
     .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    
+    /* PDF A4 Styling */
     .a4-print-container { width: 794px !important; height: 1123px !important; padding: 30px 40px; box-sizing: border-box; background-color: white; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; page-break-after: always;}
     .pdf-header-title { font-size: 18px; font-weight: 700; color: #4c1d95; margin-bottom: 2px; font-family: 'Sarabun', sans-serif;}
     .pdf-header-subtitle { font-size: 13px; font-weight: 600; color: #4b5563; font-family: 'Sarabun', sans-serif; margin-bottom: 2px;}
@@ -69,15 +69,27 @@
     .pdf-table td { border: 1px solid #e9d5ff; vertical-align: middle; padding: 2px 6px; font-size: 12px; font-weight: 500; color: #334155; text-align: center;}
     .pdf-table td.text-left-pdf { text-align: left !important; padding-left: 12px !important;}
     
-    /* โหมดพิมพ์ขาวดำ ปรับให้อ่อนลงเป็นเทาเข้มเพื่อความสวยงาม */
+    /* PDF Black and White Mode (ปรับเส้นขอบให้อ่อนลงเป็นสีเทา) */
     .pdf-mode-bw { background-color: #ffffff !important; }
-    .pdf-mode-bw * { color: #1e293b !important; border-color: #94a3b8 !important; }
-    .pdf-mode-bw .pdf-table th { background-color: #ffffff !important; color: #1e293b !important; border: 1px solid #94a3b8 !important; border-bottom: 2px solid #64748b !important; }
+    .pdf-mode-bw * { color: #334155 !important; border-color: #cbd5e1 !important; }
+    .pdf-mode-bw .pdf-header-title { color: #000000 !important; }
+    .pdf-mode-bw .pdf-table th { background-color: #f1f5f9 !important; color: #0f172a !important; border: 1px solid #94a3b8 !important; border-bottom: 2px solid #64748b !important; }
     .pdf-mode-bw .pdf-table td { background-color: #ffffff !important; border: 1px solid #94a3b8 !important; color: #1e293b !important; }
     
     .print-layer-hidden { display: none; }
     .print-layer-visible { display: block; position: absolute; top: 0; left: 0; z-index: -100; opacity: 0; pointer-events: none; }
     .qr-grid-page { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(5, 1fr); gap: 15px; width: 100%; height: 100%; }
+    
+    /* Glassmorphism Styles สำหรับหน้านักเรียน */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    }
+    .glass-gradient-bg { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); }
+
     #qr-reader { width: 100%; max-width: 400px; margin: 0 auto; border-radius: 16px; overflow: hidden; border: 2px dashed #cbd5e1; }
     #qr-reader video { object-fit: cover; }
     .spinner { border: 4px solid rgba(109, 40, 217, 0.1); width: 50px; height: 50px; border-radius: 50%; border-left-color: #6d28d9; animation: spin 1s linear infinite; }
@@ -99,7 +111,7 @@
     const { useState, useEffect, useMemo, useRef, Component } = React;
 
     // ==========================================================
-    // ⚙️ 1. SUPABASE CONFIGURATION (เอาลิงก์และ Key จาก Supabase มาใส่ 2 บรรทัดนี้)
+    // ⚙️ 1. SUPABASE CONFIGURATION 
     // ==========================================================
     const SUPABASE_URL = "https://edjrjqyxxikbvyerwbji.supabase.co"; 
     const SUPABASE_ANON_KEY = "sb_publishable_QJAn4_3OJOtdDGCWQo-wlg_B2RPo1gH"; 
@@ -136,10 +148,31 @@
         return `${String(d.getDate()).padStart(2,'0')} ${months[d.getMonth()]} ${d.getFullYear()+543}`; 
     };
 
-    const QRCodeCanvas = ({ text, size }) => {
+    const copyToClipboard = (text) => {
+        const el = document.createElement('textarea');
+        el.value = text;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        window.showGlobalToast('คัดลอกข้อความสำเร็จ!', 'success');
+    };
+
+    const QRCodeCanvas = ({ text, size, isDark = false }) => {
         const qrRef = useRef(null);
-        useEffect(() => { if (window.QRious && qrRef.current && text) new window.QRious({ element: qrRef.current, value: text, size: size, level: 'H' }); }, [text, size]);
-        return <canvas ref={qrRef} style={{ width: size, height: size }} className="rounded-lg shadow-sm border border-slate-100"></canvas>;
+        useEffect(() => { 
+            if (window.QRious && qrRef.current && text) {
+                new window.QRious({ 
+                    element: qrRef.current, 
+                    value: text, 
+                    size: size, 
+                    level: 'H',
+                    background: isDark ? 'transparent' : 'white',
+                    foreground: isDark ? 'white' : 'black'
+                }); 
+            }
+        }, [text, size, isDark]);
+        return <canvas ref={qrRef} style={{ width: size, height: size }} className={`rounded-lg ${isDark ? '' : 'shadow-sm border border-slate-100'}`}></canvas>;
     };
 
     const calculateBMI = (weight, height, name = '') => {
@@ -178,13 +211,11 @@
 
     const isActive = (s) => !s.status || s.status === 'active';
 
-    // 🟢 ระบบบันทึกข้อมูลด้วย Supabase (มีแจ้งเตือน Error ชัดเจน)
     const syncToCloud = async (action, room, payload, callback) => {
         try {
             if (SUPABASE_URL === "YOUR_SUPABASE_URL") {
                 if(callback) callback(); return; 
             }
-
             let typeStr = '';
             if (action === 'saveSettings') typeStr = 'settings';
             else if (action === 'saveStudents') typeStr = 'students';
@@ -192,15 +223,8 @@
             else if (action === 'saveFunds') typeStr = 'funds';
             else if (action === 'saveHealth') typeStr = 'health';
 
-            // บันทึก/อัปเดตข้อมูล (Upsert)
-            const { error } = await supabase
-                .from('classflow_data')
-                .upsert({ room: room, type: typeStr, payload: payload }, { onConflict: 'room, type' });
-
-            if (error) {
-                console.error("Supabase Error Detail:", error);
-                throw new Error(error.message);
-            }
+            const { error } = await supabase.from('classflow_data').upsert({ room: room, type: typeStr, payload: payload }, { onConflict: 'room, type' });
+            if (error) throw new Error(error.message);
             if(callback) callback();
         } catch(err) {
             console.error("Sync Error:", err);
@@ -250,9 +274,10 @@
     );
 
     const LoginPage = ({ onLogin, availableRooms, savedSession, onClearSession, showDialog }) => {
-      const [role, setRole] = useState('head'); 
+      const [role, setRole] = useState('student'); 
       const [room, setRoom] = useState(availableRooms[0] || '');
       const [pin, setPin] = useState('');
+      const [studentId, setStudentId] = useState('');
       const [rememberMe, setRememberMe] = useState(false);
 
       if (savedSession) {
@@ -261,10 +286,10 @@
                   <div className="w-full max-w-[400px] bg-white rounded-[32px] shadow-2xl p-8 text-center relative border border-slate-100 z-10">
                       <button onClick={onClearSession} className="absolute top-4 right-4 w-8 h-8 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-100"><i className="fas fa-times"></i></button>
                       <div className="w-20 h-20 bg-gradient-to-br from-[#6d28d9] to-[#8b5cf6] rounded-3xl flex items-center justify-center text-white mx-auto mb-6 shadow-lg shadow-primary/30">
-                          <i className={`fas ${savedSession.role === 'admin' ? 'fa-shield-alt' : 'fa-user-graduate'} text-4xl`}></i>
+                          <i className={`fas ${savedSession.role === 'admin' ? 'fa-shield-alt' : (savedSession.role === 'student' ? 'fa-user' : 'fa-user-graduate')} text-4xl`}></i>
                       </div>
                       <h2 className="text-2xl font-black text-slate-800 mb-1">ยินดีต้อนรับกลับมา</h2>
-                      <p className="text-slate-500 text-sm mb-8">{savedSession.role === 'admin' ? 'โหมดผู้ดูแลระบบ' : `ห้อง ${savedSession.room}`}</p>
+                      <p className="text-slate-500 text-sm mb-8">{savedSession.role === 'admin' ? 'โหมดผู้ดูแลระบบ' : (savedSession.role === 'student' ? `นักเรียนห้อง ${savedSession.room}` : `หัวหน้าห้อง ${savedSession.room}`)}</p>
                       <button onClick={() => onLogin(savedSession, true)} className="w-full py-4 bg-[#6d28d9] text-white rounded-2xl font-bold shadow-lg active:scale-95 transition-all hover:bg-[#5b21b6] relative z-20">เข้าสู่ระบบต่อด้วยบัญชีนี้</button>
                   </div>
               </div>
@@ -276,10 +301,15 @@
         if (role === 'admin') {
             if(pin) onLogin({ role: 'admin', room: null, pin: pin }, rememberMe);
             else showDialog({type: 'alert', title: 'แจ้งเตือน', message: 'กรุณาใส่รหัสผ่านแอดมิน'});
-        } else {
+        } else if (role === 'head') {
             if (!room) showDialog({type: 'alert', title: 'แจ้งเตือน', message: 'ไม่พบห้องเรียน กรุณาติดต่อแอดมินเพื่อเพิ่มห้องในระบบ'});
             else if (pin) onLogin({ role: 'head', room, pin: pin }, rememberMe);
             else showDialog({type: 'alert', title: 'แจ้งเตือน', message: 'กรุณาใส่รหัส PIN ห้อง'});
+        } else {
+            // Student Login
+            if (!room) showDialog({type: 'alert', title: 'แจ้งเตือน', message: 'ไม่พบห้องเรียน'});
+            else if (studentId) onLogin({ role: 'student', room, studentCode: studentId.trim() }, rememberMe);
+            else showDialog({type: 'alert', title: 'แจ้งเตือน', message: 'กรุณากรอกรหัสประจำตัวนักเรียน'});
         }
       };
 
@@ -300,34 +330,37 @@
                   <div className="space-y-4">
                     <div className="flex items-center gap-4 bg-white/10 p-4 rounded-2xl backdrop-blur-sm"><div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i className="fas fa-clipboard-check text-blue-200"></i></div><div><h3 className="font-bold text-sm">เช็คชื่อกิจกรรม</h3><p className="text-blue-100 text-[11px] mt-0.5">รองรับหลายกิจกรรม ส่งออก PDF สะอาดตา</p></div></div>
                     <div className="flex items-center gap-4 bg-white/10 p-4 rounded-2xl backdrop-blur-sm"><div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i className="fas fa-wallet text-emerald-300"></i></div><div><h3 className="font-bold text-sm">จัดการกองทุนห้อง</h3><p className="text-blue-100 text-[11px] mt-0.5">ระบบติดตามการเก็บเงิน แยกโอน/สด</p></div></div>
-                    <div className="flex items-center gap-4 bg-white/10 p-4 rounded-2xl backdrop-blur-sm"><div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i className="fas fa-weight-scale text-rose-300"></i></div><div><h3 className="font-bold text-sm">ข้อมูลสุขภาพ</h3><p className="text-blue-100 text-[11px] mt-0.5">บันทึกและประมวลผล BMI อัตโนมัติ</p></div></div>
+                    <div className="flex items-center gap-4 bg-white/10 p-4 rounded-2xl backdrop-blur-sm"><div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><i className="fas fa-id-badge text-amber-300"></i></div><div><h3 className="font-bold text-sm">ระบบนักเรียน</h3><p className="text-blue-100 text-[11px] mt-0.5">นักเรียนเช็คสถานะตัวเองได้ผ่านสมาร์ทโฟน</p></div></div>
                   </div>
                 </div>
               </div>
 
-              <div className="w-full lg:w-7/12 p-6 md:p-12 flex flex-col justify-center bg-white relative flex-1">
+              <div className="w-full lg:w-7/12 p-6 md:p-8 flex flex-col justify-center bg-white relative flex-1">
                 <div className="max-w-md w-full mx-auto relative z-20">
-                  <div className="lg:hidden text-center mb-8">
-                    <div className="w-16 h-16 bg-gradient-to-br from-[#6d28d9] to-[#8b5cf6] rounded-[20px] flex items-center justify-center text-white mx-auto mb-5 shadow-lg"><i className="fas fa-layer-group text-3xl"></i></div>
+                  <div className="lg:hidden text-center mb-6">
+                    <div className="w-14 h-14 bg-gradient-to-br from-[#6d28d9] to-[#8b5cf6] rounded-[16px] flex items-center justify-center text-white mx-auto mb-4 shadow-lg"><i className="fas fa-layer-group text-2xl"></i></div>
                     <h1 className="text-2xl font-black text-slate-800 tracking-tight">เข้าสู่ระบบ</h1>
-                    <p className="text-slate-500 font-medium text-xs mt-1">จัดการข้อมูลห้องเรียนอย่างมีประสิทธิภาพ</p>
+                    <p className="text-slate-500 font-medium text-xs mt-1">ClassFlow ระบบจัดการชั้นเรียน</p>
                   </div>
 
-                  <form onSubmit={handleLogin} className="space-y-6">
+                  <form onSubmit={handleLogin} className="space-y-5">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-3">สถานะผู้ใช้งาน</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button type="button" onClick={() => setRole('head')} className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${role === 'head' ? 'border-[#6d28d9] bg-indigo-50 text-[#6d28d9]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${role === 'head' ? 'bg-[#6d28d9] text-white shadow-md' : 'bg-slate-100'}`}><i className="fas fa-user-graduate"></i></div><span className="font-bold text-sm">เข้าจัดการห้อง</span>
+                      <label className="block text-xs font-bold text-slate-700 mb-2">เลือกสถานะผู้ใช้งาน</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button type="button" onClick={() => setRole('student')} className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1.5 transition-all ${role === 'student' ? 'border-[#6d28d9] bg-purple-50 text-[#6d28d9]' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
+                          <i className="fas fa-user text-xl mb-1"></i><span className="font-bold text-[11px]">นักเรียน</span>
                         </button>
-                        <button type="button" onClick={() => setRole('admin')} className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${role === 'admin' ? 'border-amber-500 bg-amber-50 text-amber-600' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg ${role === 'admin' ? 'bg-amber-500 text-white shadow-md' : 'bg-slate-100'}`}><i className="fas fa-shield-alt"></i></div><span className="font-bold text-sm">ผู้ดูแลระบบ</span>
+                        <button type="button" onClick={() => setRole('head')} className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1.5 transition-all ${role === 'head' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
+                          <i className="fas fa-user-tie text-xl mb-1"></i><span className="font-bold text-[11px]">หัวหน้าห้อง</span>
+                        </button>
+                        <button type="button" onClick={() => setRole('admin')} className={`p-3 rounded-xl border-2 flex flex-col items-center justify-center gap-1.5 transition-all ${role === 'admin' ? 'border-amber-500 bg-amber-50 text-amber-600' : 'border-slate-100 text-slate-400 hover:bg-slate-50'}`}>
+                          <i className="fas fa-shield-alt text-xl mb-1"></i><span className="font-bold text-[11px]">ผู้ดูแลระบบ</span>
                         </button>
                       </div>
                     </div>
 
                     <div className="space-y-4">
-                      {role === 'head' && (
+                      {(role === 'head' || role === 'student') && (
                         <div>
                           <label className="block text-xs font-bold text-slate-700 mb-1">เลือกห้องเรียน</label>
                           {availableRooms.length === 0 ? (
@@ -335,16 +368,24 @@
                                   ยังไม่มีห้องเรียน กรุณาให้แอดมินเพิ่มก่อน
                               </div>
                           ) : (
-                              <select value={room} onChange={(e) => setRoom(e.target.value)} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:border-[#6d28d9] outline-none transition-colors cursor-pointer">
+                              <select value={room} onChange={(e) => setRoom(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:border-[#6d28d9] outline-none transition-colors cursor-pointer text-sm">
                                 {availableRooms.map(r => <option key={r} value={r}>{r}</option>)}
                               </select>
                           )}
                         </div>
                       )}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 mb-1">{role === 'admin' ? 'รหัสความปลอดภัยผู้ดูแลระบบ (PIN)' : 'รหัสความปลอดภัยห้องเรียน (PIN)'}</label>
-                        <input type="password" placeholder="••••••" value={pin} onChange={(e) => setPin(e.target.value)} className={`w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold tracking-widest outline-none transition-colors text-center text-lg ${role === 'admin' ? 'focus:border-amber-500' : 'focus:border-[#6d28d9]'}`} />
-                      </div>
+                      
+                      {role === 'student' ? (
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">รหัสประจำตัวนักเรียน</label>
+                            <input type="text" placeholder="เช่น 66001" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold tracking-wider outline-none transition-colors text-center text-lg focus:border-[#6d28d9]" />
+                          </div>
+                      ) : (
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">{role === 'admin' ? 'รหัสความปลอดภัยแอดมิน (PIN)' : 'รหัสความปลอดภัยห้องเรียน (PIN)'}</label>
+                            <input type="password" placeholder="••••••" value={pin} onChange={(e) => setPin(e.target.value)} className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold tracking-widest outline-none transition-colors text-center text-lg ${role === 'admin' ? 'focus:border-amber-500' : 'focus:border-blue-500'}`} />
+                          </div>
+                      )}
                     </div>
 
                     <div className="flex items-center pl-1">
@@ -352,7 +393,7 @@
                         <label htmlFor="rememberMeDesktop" className="ml-2 text-xs font-bold text-slate-500 cursor-pointer">จดจำการเข้าสู่ระบบไว้ในเครื่องนี้</label>
                     </div>
 
-                    <button type="submit" disabled={role === 'head' && availableRooms.length === 0} className={`w-full py-4 rounded-xl text-white font-bold shadow-lg transition-all active:scale-95 relative z-30 ${role === 'admin' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-[#6d28d9] hover:bg-[#5b21b6]'} ${(role === 'head' && availableRooms.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}>เข้าสู่ระบบ</button>
+                    <button type="submit" disabled={(role === 'head' || role === 'student') && availableRooms.length === 0} className={`w-full py-3.5 rounded-xl text-white font-bold shadow-lg transition-all active:scale-95 relative z-30 ${role === 'admin' ? 'bg-amber-500 hover:bg-amber-600' : (role === 'head' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-[#6d28d9] hover:bg-[#5b21b6]')} ${((role === 'head' || role === 'student') && availableRooms.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}>เข้าสู่ระบบ</button>
                   </form>
                 </div>
               </div>
@@ -429,7 +470,7 @@
                             <div>
                                 <label className="block text-xs font-bold text-slate-600 mb-1">ลิงก์ ZoneCheck (ดูคะแนนเขต)</label>
                                 <input type="text" value={globalSettings.zoneCheckUrl} onChange={(e)=>setGlobalSettings({...globalSettings, zoneCheckUrl: e.target.value})} placeholder="https://..." className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-[#6d28d9]" />
-                                <p className="text-[10px] text-slate-400 mt-1">ใช้สำหรับปุ่มลัดในเมนูของหัวหน้าห้องทุกห้อง</p>
+                                <p className="text-[10px] text-slate-400 mt-1">ใช้สำหรับปุ่มลัดในเมนูของทุกคน</p>
                             </div>
                         </div>
 
@@ -457,7 +498,7 @@
                         </div>
                         
                         <div className="lg:col-span-2 flex flex-col gap-3 h-fit max-h-[80vh] overflow-y-auto custom-scrollbar pr-2 relative z-20">
-                            {rooms.length === 0 ? <div className="p-8 text-center text-slate-400 bg-white rounded-[24px] border border-slate-200">ยังไม่มีห้องเรียนในระบบ</div> : 
+                            {rooms.length === 0 ? <div className="p-8 text-center text-slate-400 bg-white rounded-[24px] border border-slate-200">ยังไม่มีห้องเรียนในระบบ เริ่มพิมพ์ชื่อห้องเพิ่มได้เลยครับ</div> : 
                              rooms.map((r, idx) => (
                                 <div key={r} className="bg-white p-3 sm:p-4 rounded-[20px] shadow-sm border border-slate-200 flex items-center justify-between group hover:border-[#6d28d9] transition-all relative">
                                     <button onClick={() => enterRoom(r)} className="flex items-center gap-4 flex-1 text-left relative z-10 w-full">
@@ -482,6 +523,180 @@
             </div>
         )
     };
+
+    const StudentDashboard = ({ user, onLogout, globalSettings }) => {
+        const [data, setData] = useState({ students: [], records: [], funds: [], health: [], settings: {} });
+        const [loading, setLoading] = useState(true);
+
+        useEffect(() => {
+            const fetchStudentData = async () => {
+                try {
+                    const { data: cloudData, error } = await supabase.from('classflow_data').select('type, payload').eq('room', user.room);
+                    if (error) throw error;
+                    
+                    let parsedData = { students: [], records: [], funds: [], health: [], settings: {} };
+                    if(cloudData && cloudData.length > 0) {
+                        cloudData.forEach(item => {
+                            if(item.type === 'students') parsedData.students = item.payload || [];
+                            if(item.type === 'records') parsedData.records = item.payload || [];
+                            if(item.type === 'funds') parsedData.funds = item.payload || [];
+                            if(item.type === 'health') parsedData.health = item.payload || [];
+                            if(item.type === 'settings') parsedData.settings = item.payload || {};
+                        });
+                    }
+                    setData(parsedData);
+                } catch(e) {
+                    window.showGlobalToast('ไม่สามารถดึงข้อมูลได้', 'error');
+                }
+                setLoading(false);
+            };
+            fetchStudentData();
+        }, [user.room]);
+
+        if(loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center"><div className="spinner border-t-white"></div></div>;
+
+        const myProfile = data.students.find(s => s.code === user.studentCode || s.id === user.studentCode);
+        
+        if(!myProfile) {
+            return (
+                <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
+                    <div className="w-20 h-20 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center text-4xl mb-6"><i className="fas fa-times-circle"></i></div>
+                    <h2 className="text-xl font-black text-white mb-2">ไม่พบข้อมูลนักเรียน</h2>
+                    <p className="text-slate-400 text-sm mb-8">รหัสประจำตัว '{user.studentCode}' ไม่มีในระบบของห้อง {user.room}</p>
+                    <button onClick={onLogout} className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all"><i className="fas fa-arrow-left mr-2"></i> กลับไปหน้าล็อกอิน</button>
+                </div>
+            )
+        }
+
+        // Calculate Stats
+        let p=0, a=0, e=0;
+        data.records.forEach(rec => {
+            if((rec.activity || 'หน้าเสาธง') === 'หน้าเสาธง' && rec.data && rec.data[myProfile.id]) {
+                const st = rec.data[myProfile.id];
+                if(st === 'present') p++; else if(st === 'absent') a++; else if(st === 'excused') e++;
+            }
+        });
+        const totalAtt = p+a+e; const attPercent = totalAtt > 0 ? Math.round((p/totalAtt)*100) : 100;
+
+        let fundUnpaid = 0;
+        data.funds.forEach(f => {
+            const pData = (f.payments || {})[myProfile.id];
+            let paid = 0; 
+            if(typeof pData === 'object' && pData !== null) paid = pData.amount || 0; else if(typeof pData === 'number') paid = pData;
+            const target = parseFloat(f.amount) || 0;
+            if (paid < target) fundUnpaid++;
+        });
+
+        const currentHealthDate = new Date().toISOString().split('T')[0].substring(0,7);
+        const myHealthRec = data.health.find(r => r.date === currentHealthDate) || { data: {} };
+        const myHData = (myHealthRec.data || {})[myProfile.id] || {w:'', h:''};
+        const bmiData = calculateBMI(myHData.w, myHData.h, myProfile.name);
+
+        const handleChatClick = () => {
+            if(data.settings.lineUrl) window.open(data.settings.lineUrl, '_blank');
+            else window.showGlobalToast('หัวหน้าห้องยังไม่ได้ตั้งค่าช่องทางติดต่อครับ', 'warning');
+        };
+
+        const handleZoneCheck = () => {
+            if(globalSettings?.zoneCheckUrl) {
+                let url = globalSettings.zoneCheckUrl;
+                if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+                window.open(url, '_blank');
+            } else window.showGlobalToast('แอดมินยังไม่ได้ตั้งค่าลิงก์ ZoneCheck', 'warning');
+        };
+
+        return (
+            <div className="min-h-screen bg-slate-900 font-sans pb-10 relative overflow-hidden">
+                {/* Background Decoration */}
+                <div className="absolute top-[-10%] left-[-10%] w-[400px] h-[400px] bg-indigo-600 rounded-full mix-blend-screen filter blur-[120px] opacity-30 animate-pulse pointer-events-none"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-purple-600 rounded-full mix-blend-screen filter blur-[120px] opacity-30 animate-pulse pointer-events-none" style={{animationDelay: '2s'}}></div>
+
+                <div className="max-w-[450px] mx-auto p-4 relative z-10">
+                    <header className="flex justify-between items-center mb-6 mt-4">
+                        <div className="text-white">
+                            <h1 className="text-lg font-black tracking-wide">ClassFlow</h1>
+                            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Student Portal</p>
+                        </div>
+                        <button onClick={onLogout} className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-red-500/80 transition-colors backdrop-blur-md"><i className="fas fa-sign-out-alt"></i></button>
+                    </header>
+
+                    {/* ID Card (Glassmorphism) */}
+                    <div className="glass-card glass-gradient-bg rounded-[24px] p-6 mb-6 text-white relative overflow-hidden shadow-2xl">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full transform translate-x-1/2 -translate-y-1/2"></div>
+                        <div className="flex justify-between items-start mb-6 relative z-10">
+                            <div>
+                                <h2 className="text-2xl font-black mb-1 leading-tight">{myProfile.name}</h2>
+                                <p className="text-indigo-200 text-xs font-medium mb-1">ห้อง {user.room} • รหัส {myProfile.code}</p>
+                                <p className="text-indigo-200 text-[10px] font-bold px-2 py-1 bg-white/10 rounded inline-block">{myProfile.subgroup || 'นักเรียนทั่วไป'}</p>
+                            </div>
+                            <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-xl p-1 overflow-hidden shrink-0 border border-white/30">
+                                {myProfile.image ? <img src={myProfile.image} className="w-full h-full object-cover rounded-lg" /> : <div className="w-full h-full flex items-center justify-center"><i className="fas fa-user text-2xl text-white/50"></i></div>}
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-3 relative z-10 border-t border-white/20 pt-4">
+                            <div className="text-center">
+                                <p className="text-3xl font-black">{attPercent}<span className="text-lg">%</span></p>
+                                <p className="text-[10px] text-indigo-200 mt-1 font-bold">มาเรียน</p>
+                            </div>
+                            <div className="text-center border-l border-white/20">
+                                <p className="text-3xl font-black">{fundUnpaid}</p>
+                                <p className="text-[10px] text-indigo-200 mt-1 font-bold">ค้างจ่าย (งาน)</p>
+                            </div>
+                            <div className="text-center border-l border-white/20 flex flex-col items-center justify-center">
+                                <div className="bg-white p-1 rounded-lg shadow-inner"><QRCodeCanvas text={myProfile.code || myProfile.id} size={50} isDark={false} /></div>
+                                <p className="text-[9px] text-indigo-200 mt-1 font-bold">QR สแกน</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 className="text-white text-xs font-bold uppercase tracking-widest mb-3 pl-2 opacity-80">เมนูบริการ</h3>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="glass-card rounded-[20px] p-4 hover:bg-white/10 transition-colors flex flex-col justify-between h-[100px]">
+                            <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-2"><i className="fas fa-clipboard-check"></i></div>
+                            <div>
+                                <h4 className="text-white font-bold text-sm">สถิติเรียน</h4>
+                                <p className="text-slate-400 text-[10px]">ขาด {a} • ลา {e}</p>
+                            </div>
+                        </div>
+                        <div className="glass-card rounded-[20px] p-4 hover:bg-white/10 transition-colors flex flex-col justify-between h-[100px]">
+                            <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mb-2"><i className="fas fa-wallet"></i></div>
+                            <div>
+                                <h4 className="text-white font-bold text-sm">กองทุนห้อง</h4>
+                                <p className="text-slate-400 text-[10px]">{fundUnpaid > 0 ? `ค้าง ${fundUnpaid} รายการ` : 'จ่ายครบทั้งหมด'}</p>
+                            </div>
+                        </div>
+                        <div className="glass-card rounded-[20px] p-4 hover:bg-white/10 transition-colors flex flex-col justify-between h-[100px]">
+                            <div className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center mb-2"><i className="fas fa-weight-scale"></i></div>
+                            <div>
+                                <h4 className="text-white font-bold text-sm">ค่า BMI</h4>
+                                <p className="text-slate-400 text-[10px]">{bmiData.bmi > 0 ? `${bmiData.bmi} (${bmiData.label})` : 'ยังไม่มีข้อมูลเดือนนี้'}</p>
+                            </div>
+                        </div>
+                        <button onClick={handleZoneCheck} className="text-left glass-card rounded-[20px] p-4 hover:bg-white/10 transition-colors flex flex-col justify-between h-[100px]">
+                            <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center mb-2"><i className="fas fa-star"></i></div>
+                            <div>
+                                <h4 className="text-white font-bold text-sm">ZoneCheck</h4>
+                                <p className="text-slate-400 text-[10px]">ดูคะแนนความประพฤติ</p>
+                            </div>
+                        </button>
+                    </div>
+
+                    <button onClick={handleChatClick} className="w-full glass-card bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 rounded-[20px] p-4 flex items-center justify-between transition-all group">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xl shadow-lg shadow-emerald-500/30 group-hover:scale-110 transition-transform"><i className="fab fa-line"></i></div>
+                            <div className="text-left">
+                                <h4 className="text-white font-bold">แชตหาหัวหน้าห้อง</h4>
+                                <p className="text-emerald-400 text-[11px]">สอบถามข้อมูล หรือ แจ้งลาป่วย</p>
+                            </div>
+                        </div>
+                        <i className="fas fa-chevron-right text-emerald-500"></i>
+                    </button>
+                </div>
+            </div>
+        )
+    }
 
     const TabDashboard = ({ activeStudentsCount, records, currentDate, funds, sortedStudents, activities }) => {
         const [dashTab, setDashTab] = useState('overview'); 
@@ -728,6 +943,9 @@
         const [tempNotes, setTempNotes] = useState({});
         const [isLocked, setIsLocked] = useState(false);
         const [isSaving, setIsSaving] = useState(false);
+        
+        const [showCopyModal, setShowCopyModal] = useState(false);
+        const [copyOptions, setCopyOptions] = useState({ absent: true, excused: true, notchecked: false });
 
         const effectiveLocked = isAdmin ? true : isLocked;
 
@@ -793,6 +1011,45 @@
             });
         };
 
+        const generateSummaryText = () => {
+            let text = `📢 สรุปเช็คชื่อ: ${currentActivity}\n📅 วันที่: ${formatThaiDate(currentDate)}\n--------------------\n`;
+            
+            const absentList = []; const excusedList = []; const noneList = [];
+            
+            sortedStudents.forEach(s => {
+                if(!isActive(s)) return;
+                const st = attendance[s.id];
+                const note = tempNotes[s.id] ? ` (${tempNotes[s.id]})` : '';
+                const txt = `${s.number}. ${s.name}${note}`;
+                
+                if (st === 'absent') absentList.push(txt);
+                else if (st === 'excused') excusedList.push(txt);
+                else if (!st) noneList.push(txt);
+            });
+
+            if (copyOptions.absent) {
+                text += `❌ ขาด (${absentList.length} คน):\n`;
+                if(absentList.length === 0) text += `- ไม่มี -\n`;
+                else absentList.forEach(t => text += `${t}\n`);
+                text += `\n`;
+            }
+            if (copyOptions.excused) {
+                text += `📝 ลา (${excusedList.length} คน):\n`;
+                if(excusedList.length === 0) text += `- ไม่มี -\n`;
+                else excusedList.forEach(t => text += `${t}\n`);
+                text += `\n`;
+            }
+            if (copyOptions.notchecked) {
+                text += `⚠️ ยังไม่เช็ค (${noneList.length} คน):\n`;
+                if(noneList.length === 0) text += `- ไม่มี -\n`;
+                else noneList.forEach(t => text += `${t}\n`);
+                text += `\n`;
+            }
+            
+            copyToClipboard(text.trim());
+            setShowCopyModal(false);
+        };
+
         useEffect(() => {
             let html5QrCode;
             if (attTab === 'scan' && !isAdmin) {
@@ -824,7 +1081,7 @@
              </div>
              )}
 
-             <div className="bg-white p-4 md:p-5 rounded-[20px] shadow-sm border border-slate-100">
+             <div className="bg-white p-4 md:p-5 rounded-[20px] shadow-sm border border-slate-100 relative">
                  <div className="flex flex-col sm:flex-row justify-between items-start mb-4 gap-3">
                      <div className="flex items-center gap-3 w-full sm:w-auto">
                          <div className="w-10 h-10 bg-[#6d28d9] text-white rounded-xl flex items-center justify-center shadow-sm shrink-0"><i className="fas fa-calendar-check"></i></div>
@@ -869,11 +1126,37 @@
 
                  <div className="pt-3 border-t border-slate-100 border-dashed">
                     <PrintModeToggle pdfMode={pdfMode} setPdfMode={setPdfMode} />
-                    <div className="grid grid-cols-2 gap-2">
-                        <button onClick={() => {playSound('tap'); setAttPrintSettings({ show: true, filterType: 'all', selectedIds: [], activity: currentActivity });}} className="py-2.5 bg-red-50/50 text-red-600 rounded-xl text-[12px] font-bold hover:bg-red-50 transition border border-red-100/50"><i className="fas fa-file-pdf mr-1"></i> พิมพ์ใบเช็คชื่อ PDF</button>
-                        <button onClick={() => exportExcel('attendance', currentActivity)} className="py-2.5 bg-green-50/50 text-green-600 rounded-xl text-[12px] font-bold hover:bg-green-50 transition border border-green-100/50"><i className="fas fa-file-excel mr-1"></i> ดาวน์โหลด Excel</button>
+                    <div className="grid grid-cols-3 gap-2">
+                        <button onClick={() => {playSound('tap'); setAttPrintSettings({ show: true, filterType: 'all', selectedIds: [], activity: currentActivity });}} className="py-2.5 bg-red-50/50 text-red-600 rounded-xl text-[11px] font-bold hover:bg-red-50 transition border border-red-100/50"><i className="fas fa-file-pdf mr-1"></i> PDF</button>
+                        <button onClick={() => exportExcel('attendance', currentActivity)} className="py-2.5 bg-green-50/50 text-green-600 rounded-xl text-[11px] font-bold hover:bg-green-50 transition border border-green-100/50"><i className="fas fa-file-excel mr-1"></i> Excel</button>
+                        <button onClick={() => {playSound('tap'); setShowCopyModal(true);}} className="py-2.5 bg-blue-50/50 text-blue-600 rounded-xl text-[11px] font-bold hover:bg-blue-50 transition border border-blue-100/50"><i className="fas fa-copy mr-1"></i> คัดลอกสรุป</button>
                     </div>
                  </div>
+
+                 {showCopyModal && (
+                    <div className="absolute top-0 left-0 w-full h-full bg-white/90 backdrop-blur-sm z-30 rounded-[20px] flex flex-col p-5 animate-in fade-in zoom-in border border-blue-200">
+                        <h3 className="font-black text-slate-800 mb-3"><i className="fas fa-copy text-blue-500 mr-2"></i>คัดลอกข้อความสรุป</h3>
+                        <p className="text-xs text-slate-500 mb-3">เลือกกลุ่มนักเรียนที่ต้องการสรุปเพื่อส่งลงกลุ่ม</p>
+                        <div className="space-y-2 mb-5">
+                            <label className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl cursor-pointer">
+                                <input type="checkbox" checked={copyOptions.absent} onChange={e=>setCopyOptions({...copyOptions, absent: e.target.checked})} className="accent-red-500 w-4 h-4" />
+                                <span className="text-sm font-bold text-red-600">รายชื่อคนที่ ขาดเรียน</span>
+                            </label>
+                            <label className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-100 rounded-xl cursor-pointer">
+                                <input type="checkbox" checked={copyOptions.excused} onChange={e=>setCopyOptions({...copyOptions, excused: e.target.checked})} className="accent-blue-500 w-4 h-4" />
+                                <span className="text-sm font-bold text-blue-600">รายชื่อคนที่ ลาป่วย/ลากิจ</span>
+                            </label>
+                            <label className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-100 rounded-xl cursor-pointer">
+                                <input type="checkbox" checked={copyOptions.notchecked} onChange={e=>setCopyOptions({...copyOptions, notchecked: e.target.checked})} className="accent-amber-500 w-4 h-4" />
+                                <span className="text-sm font-bold text-amber-600">รายชื่อคนที่ ยังไม่ได้เช็ค</span>
+                            </label>
+                        </div>
+                        <div className="flex gap-2 mt-auto">
+                            <button onClick={()=>setShowCopyModal(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl text-xs hover:bg-slate-200">ยกเลิก</button>
+                            <button onClick={generateSummaryText} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl text-xs hover:bg-blue-700 shadow-md"><i className="fas fa-check mr-1"></i> คัดลอกเลย</button>
+                        </div>
+                    </div>
+                 )}
              </div>
 
              {attTab === 'scan' && !isAdmin ? (
@@ -928,6 +1211,8 @@
         const [newTitle, setNewTitle] = useState(''); const [newAmount, setNewAmount] = useState('');
         const [activeFundId, setActiveFundId] = useState(funds[0]?.id || null);
         const [isSaving, setIsSaving] = useState(false);
+        const [showCopyModal, setShowCopyModal] = useState(false);
+        const [copyUnpaid, setCopyUnpaid] = useState(true);
 
         useEffect(() => { if(!activeFundId && funds.length > 0) setActiveFundId(funds[0].id); }, [funds]);
 
@@ -972,6 +1257,35 @@
             }));
         };
 
+        const generateSummaryText = () => {
+            if(!activeFund) return;
+            let text = `💰 สรุปกองทุน: ${activeFund.title}\n🎯 เป้าหมาย: ${activeFund.amount} บาท/คน\n--------------------\n`;
+            
+            const unpaidList = []; 
+            const targetAmount = parseFloat(activeFund.amount) || 0;
+
+            sortedStudents.forEach(s => {
+                if(!isActive(s)) return;
+                const pData = (activeFund.payments || {})[s.id];
+                let paid = 0;
+                if(typeof pData === 'object' && pData !== null) paid = pData.amount || 0; else if (typeof pData === 'number') paid = pData;
+                
+                if (paid < targetAmount) {
+                    const diff = targetAmount - paid;
+                    unpaidList.push(`${s.number}. ${s.name} (ค้าง ${diff}฿)`);
+                }
+            });
+
+            if(copyUnpaid) {
+                text += `⚠️ รายชื่อคนค้างจ่าย (${unpaidList.length} คน):\n`;
+                if(unpaidList.length === 0) text += `- จ่ายครบทุกคนแล้ว 🎉 -\n`;
+                else unpaidList.forEach(t => text += `${t}\n`);
+            }
+            
+            copyToClipboard(text.trim());
+            setShowCopyModal(false);
+        };
+
         return (
           <div className="animate-in fade-in space-y-6 max-w-[600px] mx-auto">
             {!isAdmin && (
@@ -1013,7 +1327,7 @@
                 const isLocked = activeFund.isLocked;
 
                 return (
-                    <div className="bg-white rounded-[20px] shadow-sm border border-slate-100 overflow-hidden pb-6">
+                    <div className="bg-white rounded-[20px] shadow-sm border border-slate-100 overflow-hidden pb-6 relative">
                         <div className="bg-gradient-to-br from-amber-500 to-orange-500 p-6 text-white relative overflow-hidden">
                             <div className="relative z-10 flex justify-between items-start mb-6">
                                 <div><h2 className="text-xl font-black mb-1">{activeFund.title}</h2><p className="text-orange-100 text-xs font-medium"><i className="fas fa-calendar-alt mr-1"></i> {formatThaiDate(activeFund.date)}</p></div>
@@ -1053,11 +1367,29 @@
                              )}
                              <div className={`pt-3 ${!isAdmin?'border-t border-slate-200 border-dashed':''}`}>
                                 <PrintModeToggle pdfMode={pdfMode} setPdfMode={setPdfMode} />
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button onClick={() => executeDocExport('pdf', 'pdf-fund-container', `กองทุน_${activeFund.title}`)} className="py-2.5 bg-red-50/50 text-red-600 rounded-xl text-[12px] font-bold hover:bg-red-50 border border-red-100/50"><i className="fas fa-file-pdf mr-1"></i> ใบเก็บเงิน PDF</button>
-                                    <button onClick={() => exportExcel('fund')} className="py-2.5 bg-green-50/50 text-green-600 rounded-xl text-[12px] font-bold hover:bg-green-50 border border-green-100/50"><i className="fas fa-file-excel mr-1"></i> ดาวน์โหลด Excel</button>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button onClick={() => executeDocExport('pdf', 'pdf-fund-container', `กองทุน_${activeFund.title}`)} className="py-2.5 bg-red-50/50 text-red-600 rounded-xl text-[12px] font-bold hover:bg-red-50 border border-red-100/50"><i className="fas fa-file-pdf mr-1"></i> PDF</button>
+                                    <button onClick={() => exportExcel('fund')} className="py-2.5 bg-green-50/50 text-green-600 rounded-xl text-[12px] font-bold hover:bg-green-50 border border-green-100/50"><i className="fas fa-file-excel mr-1"></i> Excel</button>
+                                    <button onClick={() => {playSound('tap'); setShowCopyModal(true);}} className="py-2.5 bg-blue-50/50 text-blue-600 rounded-xl text-[11px] font-bold hover:bg-blue-50 border border-blue-100/50"><i className="fas fa-copy mr-1"></i> คัดลอกสรุป</button>
                                 </div>
                              </div>
+
+                             {showCopyModal && (
+                                <div className="absolute top-0 left-0 w-full h-full bg-white/90 backdrop-blur-sm z-30 flex flex-col p-5 animate-in fade-in zoom-in">
+                                    <h3 className="font-black text-slate-800 mb-3"><i className="fas fa-copy text-blue-500 mr-2"></i>คัดลอกข้อความสรุป</h3>
+                                    <p className="text-xs text-slate-500 mb-3">เลือกกลุ่มนักเรียนที่ต้องการสรุปเพื่อส่งลงกลุ่ม</p>
+                                    <div className="space-y-2 mb-5">
+                                        <label className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl cursor-pointer">
+                                            <input type="checkbox" checked={copyUnpaid} onChange={e=>setCopyUnpaid(e.target.checked)} className="accent-red-500 w-4 h-4" />
+                                            <span className="text-sm font-bold text-red-600">รายชื่อคนที่ ค้างจ่าย</span>
+                                        </label>
+                                    </div>
+                                    <div className="flex gap-2 mt-auto">
+                                        <button onClick={()=>setShowCopyModal(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl text-xs hover:bg-slate-200">ยกเลิก</button>
+                                        <button onClick={generateSummaryText} className="flex-1 py-3 bg-blue-600 text-white font-bold rounded-xl text-xs hover:bg-blue-700 shadow-md"><i className="fas fa-check mr-1"></i> คัดลอกเลย</button>
+                                    </div>
+                                </div>
+                             )}
                         </div>
 
                         <div className="p-3 space-y-1 max-h-[400px] overflow-y-auto">
@@ -1297,7 +1629,6 @@
              autoSyncCurrentState(latestStudents); 
          };
 
-         // 🟢 อัปโหลดไฟล์รูปภาพตรงขึ้น Supabase Storage แบบ Public
          const handleImageUpload = async (e, studentId) => {
             if(isAdmin) return;
             const file = e.target.files[0]; if(!file) return; playSound('tap');
@@ -1309,18 +1640,10 @@
                 const fileExt = file.name.split('.').pop();
                 const fileName = `${userRoom}_${studentId}_${Date.now()}.${fileExt}`;
 
-                // Upload to Supabase Storage bucket 'classflow'
-                const { error: uploadError } = await supabase.storage
-                    .from('classflow')
-                    .upload(fileName, file, { cacheControl: '3600', upsert: true });
-
+                const { error: uploadError } = await supabase.storage.from('classflow').upload(fileName, file, { cacheControl: '3600', upsert: true });
                 if (uploadError) throw uploadError;
 
-                // Get Public URL
-                const { data } = supabase.storage
-                    .from('classflow')
-                    .getPublicUrl(fileName);
-
+                const { data } = supabase.storage.from('classflow').getPublicUrl(fileName);
                 const driveUrl = data.publicUrl;
 
                 let latest = [];
@@ -1412,9 +1735,18 @@
          )
       };
 
-    const TabSettings = ({ settings, setSettings, showToast, user, onUpdatePin, showDialog }) => {
+    const TabSettings = ({ settings, setSettings, showToast, user, onUpdatePin, showDialog, syncToCloud }) => {
           const [newPin, setNewPin] = useState('');
           const [confirmPin, setConfirmPin] = useState('');
+          const [lineUrl, setLineUrl] = useState(settings?.lineUrl || '');
+
+          const handleSaveLineUrl = () => {
+              const newSettings = { ...settings, lineUrl: lineUrl };
+              setSettings(newSettings);
+              syncToCloud('saveSettings', user.room, newSettings, () => {
+                  showToast('บันทึกลิงก์ LINE สำหรับนักเรียนแล้ว', 'success');
+              });
+          };
 
           return (
              <div className="animate-in fade-in space-y-4 max-w-[600px] mx-auto">
@@ -1424,6 +1756,13 @@
                         <div>
                             <label className="block font-bold text-xs text-slate-600 mb-1">ชื่อห้องเรียน (แอดมินเท่านั้นที่เปลี่ยนได้)</label>
                             <input type="text" disabled value={settings?.roomName || ''} className="w-full p-3 bg-slate-100 border border-slate-200 rounded-xl font-bold text-sm outline-none text-slate-500 cursor-not-allowed" />
+                        </div>
+
+                        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-3">
+                            <label className="block font-bold text-xs text-emerald-800 mb-1"><i className="fab fa-line text-emerald-600 mr-1"></i> ลิงก์ LINE สำหรับให้นักเรียนติดต่อ</label>
+                            <input type="text" placeholder="https://line.me/ti/g/..." value={lineUrl} onChange={e=>setLineUrl(e.target.value)} className="w-full p-3 bg-white border border-emerald-200 rounded-lg font-medium text-xs outline-none focus:border-emerald-500" />
+                            <p className="text-[10px] text-emerald-600">เอาลิงก์ Line กลุ่ม หรือ Line ส่วนตัว มาวางเพื่อให้นักเรียนกดติดต่อจากระบบนักเรียนได้</p>
+                            <button onClick={handleSaveLineUrl} className="w-full py-2.5 bg-emerald-600 text-white font-bold rounded-lg text-xs hover:bg-emerald-700 transition-colors">บันทึกลิงก์ติดต่อ</button>
                         </div>
 
                         <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-3">
@@ -1478,7 +1817,7 @@
           { id: 'fund', icon: 'fa-wallet', label: 'กองทุนห้อง', show: true },
           { id: 'health', icon: 'fa-weight-scale', label: 'ข้อมูลสุขภาพ', show: true },
           { id: 'students', icon: 'fa-users-cog', label: 'จัดการรายชื่อ', show: true },
-          { id: 'settings', icon: 'fa-cog', label: 'ตั้งค่า PIN ห้อง', show: !isAdmin }
+          { id: 'settings', icon: 'fa-cog', label: 'ตั้งค่าระบบ', show: !isAdmin }
       ];
 
       const [activeMenu, setActiveMenu] = useState('dashboard'); 
@@ -1493,7 +1832,6 @@
       const [attPrintSettings, setAttPrintSettings] = useState({ show: false, filterType: 'all', selectedIds: [], activity: 'หน้าเสาธง' });
       const [searchPrint, setSearchPrint] = useState('');
 
-      // 🟢 ดึงข้อมูลตอนเปิดหน้า Dashboard จาก Supabase
       useEffect(() => {
           const loadDataFromCloud = async () => {
               if(SUPABASE_URL === "YOUR_SUPABASE_URL") return;
@@ -1512,6 +1850,10 @@
                           if(item.type === 'records') setRecords(item.payload || []);
                           if(item.type === 'funds') setFunds(item.payload || []);
                           if(item.type === 'health') setHealthRecords(item.payload || []);
+                          if(item.type === 'settings') {
+                              const newSet = item.payload || {};
+                              setSettings(prev => ({...prev, ...newSet}));
+                          }
                       });
                   }
               } catch(e) {
@@ -1754,7 +2096,7 @@
           case 'fund': return <TabFund funds={safeFunds} setFunds={setFunds} sortedStudents={sortedStudents} activeStudentsCount={activeStudentsCount} showToast={showToast} exportExcel={exportExcel} executeDocExport={executeDocExport} showDialog={showDialog} isAdmin={isAdmin} pdfMode={pdfMode} setPdfMode={setPdfMode} userRoom={user.room} />;
           case 'health': return <TabHealth healthRecords={healthRecords} setHealthRecords={setHealthRecords} sortedStudents={sortedStudents} exportExcel={exportExcel} executeDocExport={executeDocExport} showToast={showToast} showDialog={showDialog} isAdmin={isAdmin} pdfMode={pdfMode} setPdfMode={setPdfMode} userRoom={user.room} />;
           case 'students': return <TabStudents safeStudents={safeStudents} setStudents={setStudents} sortedStudents={sortedStudents} activeStudentsCount={activeStudentsCount} setSelectedQRStudent={setSelectedQRStudent} showToast={showToast} exportExcel={exportExcel} executeExport={executeExport} executeDocExport={executeDocExport} userPin={user.pin} settings={settings} showDialog={showDialog} isAdmin={isAdmin} pdfMode={pdfMode} setPdfMode={setPdfMode} userRoom={user.room} isExporting={isExporting} setIsExporting={setIsExporting} />;
-          case 'settings': return <TabSettings settings={settings} setSettings={setSettings} showToast={showToast} user={user} onUpdatePin={(newPin) => onUpdateRoomPin(user.room, newPin)} showDialog={showDialog} />;
+          case 'settings': return <TabSettings settings={settings} setSettings={setSettings} showToast={showToast} user={user} onUpdatePin={(newPin) => onUpdateRoomPin(user.room, newPin)} showDialog={showDialog} syncToCloud={syncToCloud} />;
           default: return <TabDashboard activeStudentsCount={activeStudentsCount} records={safeRecords} currentDate={currentDate} funds={safeFunds} sortedStudents={sortedStudents} activities={activities} />;
         }
       };
@@ -1905,7 +2247,7 @@
             </div>
           )}
 
-          {/* 🟢 ส่วนปริ้น PDF ที่ตั้งค่าขาวดำ */}
+          {/* 🟢 ส่วนปริ้น PDF ที่ตั้งค่าขาวดำ (ปรับสีขอบให้อ่อนลง) */}
           <div className={`${isExporting ? "print-layer-visible" : "print-layer-hidden"} ${pdfMode === 'bw' ? 'pdf-mode-bw' : ''}`}>
                {/* PDF เช็คชื่อหน้าเสาธง */}
                <div id="pdf-report-container">
@@ -1917,21 +2259,21 @@
                            <div style={{ flexShrink: 0, paddingBottom: '10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                {globalSettings?.schoolLogoUrl && <img src={globalSettings.schoolLogoUrl} style={{ height: '40px', width: 'auto', objectFit: 'contain', filter: pdfMode === 'bw' ? 'grayscale(100%)' : 'none' }} crossOrigin="anonymous" />}
                                <div>
-                                   <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#1e293b' : '#4c1d95' }}>รายงานเช็คชื่อ: {attPrintSettings.activity || 'หน้าเสาธง'} ห้อง {settings?.roomName}{groupText}</h1>
-                                   <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#475569' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
+                                   <h1 className="pdf-header-title">รายงานเช็คชื่อ: {attPrintSettings.activity || 'หน้าเสาธง'} ห้อง {settings?.roomName}{groupText}</h1>
+                                   <p className="pdf-header-subtitle">โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
                                </div>
                                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                                   <p style={{ margin: '0', color: pdfMode === 'bw' ? '#475569' : '#4b5563', fontSize: '12px', fontWeight: 'bold' }}>ประจำวันที่: {formatThaiDate(currentDate)}</p>
+                                   <p style={{ margin: '0', fontSize: '12px', fontWeight: 'bold' }}>ประจำวันที่: {formatThaiDate(currentDate)}</p>
                                </div>
                            </div>
                            <table className="pdf-table" style={{ width: '100%' }}>
                                  <thead>
                                      <tr>
-                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขที่</th>
-                                         <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขประจำตัว</th>
-                                         <th style={{width: '37%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ชื่อ - สกุล</th>
-                                         <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>สถานะ</th>
-                                         <th style={{width: '30%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>หมายเหตุ</th>
+                                         <th style={{width: '8%'}}>เลขที่</th>
+                                         <th style={{width: '15%'}}>เลขประจำตัว</th>
+                                         <th style={{width: '37%'}}>ชื่อ - สกุล</th>
+                                         <th style={{width: '10%'}}>สถานะ</th>
+                                         <th style={{width: '30%'}}>หมายเหตุ</th>
                                      </tr>
                                  </thead>
                                  <tbody>
@@ -1949,11 +2291,11 @@
                                            if (st === 'present') { label = '✓'; textColor = '#10b981'; } else if (st === 'absent') { label = 'ข'; textColor = '#ef4444'; } else if (st === 'excused') { label = 'ล'; textColor = '#3b82f6'; } 
                                         }
                                         return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
-                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#64748b' }}>{s.code || s.id}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#475569' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#475569' : '#64748b' }}>{s.code || s.id}</td>
                                            <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#1e293b' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
                                            <td style={{ fontWeight: '900', fontSize: '14px', color: pdfMode === 'bw' ? '#1e293b' : textColor }}>{label}</td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#475569' : (!active ? '#ef4444' : '#64748b'), fontSize: '10px', fontWeight: !active ? 'bold' : 'normal' }}>
+                                           <td style={{ color: pdfMode === 'bw' ? '#64748b' : (!active ? '#ef4444' : '#64748b'), fontSize: '10px', fontWeight: !active ? 'bold' : 'normal' }}>
                                                {active ? (noteData[s.id] || '') : stText}
                                            </td>
                                         </tr>
@@ -1975,19 +2317,19 @@
                                <div style={{ flexShrink: 0, paddingBottom: '10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                    {globalSettings?.schoolLogoUrl && <img src={globalSettings.schoolLogoUrl} style={{ height: '40px', width: 'auto', objectFit: 'contain', filter: pdfMode === 'bw' ? 'grayscale(100%)' : 'none' }} crossOrigin="anonymous" />}
                                    <div>
-                                       <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#1e293b' : '#4c1d95' }}>รายงานการเก็บเงิน: {activeF.title || ''} ห้อง {settings?.roomName}{groupText}</h1>
-                                       <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#475569' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
+                                       <h1 className="pdf-header-title">รายงานการเก็บเงิน: {activeF.title || ''} ห้อง {settings?.roomName}{groupText}</h1>
+                                       <p className="pdf-header-subtitle">โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
                                    </div>
                                </div>
                                <table className="pdf-table" style={{ width: '100%' }}>
                                      <thead>
                                          <tr>
-                                             <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขที่</th>
-                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขประจำตัว</th>
-                                             <th style={{width: '32%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ชื่อ - สกุล</th>
-                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ยอดจ่าย</th>
-                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>สถานะ</th>
-                                             <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>หมายเหตุ</th>
+                                             <th style={{width: '8%'}}>เลขที่</th>
+                                             <th style={{width: '15%'}}>เลขประจำตัว</th>
+                                             <th style={{width: '32%'}}>ชื่อ - สกุล</th>
+                                             <th style={{width: '15%'}}>ยอดจ่าย</th>
+                                             <th style={{width: '15%'}}>สถานะ</th>
+                                             <th style={{width: '15%'}}>หมายเหตุ</th>
                                          </tr>
                                      </thead>
                                      <tbody>
@@ -2002,15 +2344,15 @@
                                              const target = parseFloat(activeF.amount) || 0;
                                              const isFull = paid >= target;
                                              const methodText = method === 'transfer' ? '(โอน)' : '(สด)';
-                                             const methodColor = pdfMode === 'bw' ? '#475569' : (method === 'transfer' ? '#3b82f6' : '#64748b');
+                                             const methodColor = pdfMode === 'bw' ? '#64748b' : (method === 'transfer' ? '#3b82f6' : '#64748b');
 
                                              return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
-                                                <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
-                                                <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#64748b' }}>{s.code || s.id}</td>
+                                                <td style={{ color: pdfMode === 'bw' ? '#475569' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
+                                                <td style={{ color: pdfMode === 'bw' ? '#475569' : '#64748b' }}>{s.code || s.id}</td>
                                                 <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#1e293b' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
-                                                <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#1e293b' : 'inherit' }}>{!active ? '-' : `${paid} / ${target}`} {active && <span style={{fontSize:'9px', color: methodColor, marginLeft:'4px'}}>{methodText}</span>}</td>
-                                                <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#1e293b' : (!active ? '#94a3b8' : (isFull ? '#10b981' : '#ef4444')) }}>{!active ? '-' : (isFull ? 'จ่ายครบ' : 'ค้างจ่าย')}</td>
-                                                <td style={{ color: pdfMode === 'bw' ? '#475569' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
+                                                <td style={{ fontWeight: 'bold' }}>{!active ? '-' : `${paid} / ${target}`} {active && <span style={{fontSize:'9px', color: methodColor, marginLeft:'4px'}}>{methodText}</span>}</td>
+                                                <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#334155' : (!active ? '#94a3b8' : (isFull ? '#10b981' : '#ef4444')) }}>{!active ? '-' : (isFull ? 'จ่ายครบ' : 'ค้างจ่าย')}</td>
+                                                <td style={{ color: pdfMode === 'bw' ? '#64748b' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
                                              </tr>
                                          })}
                                      </tbody>
@@ -2033,23 +2375,23 @@
                            <div style={{ flexShrink: 0, paddingBottom: '10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                {globalSettings?.schoolLogoUrl && <img src={globalSettings.schoolLogoUrl} style={{ height: '40px', width: 'auto', objectFit: 'contain', filter: pdfMode === 'bw' ? 'grayscale(100%)' : 'none' }} crossOrigin="anonymous" />}
                                <div>
-                                   <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#1e293b' : '#4c1d95' }}>รายงานข้อมูลสุขภาพ (BMI) ห้อง {settings?.roomName}{groupText}</h1>
-                                   <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#475569' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
+                                   <h1 className="pdf-header-title">รายงานข้อมูลสุขภาพ (BMI) ห้อง {settings?.roomName}{groupText}</h1>
+                                   <p className="pdf-header-subtitle">โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
                                </div>
                                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                                   <p style={{ margin: '0', color: pdfMode === 'bw' ? '#475569' : '#4b5563', fontSize: '12px', fontWeight: 'bold' }}>ประจำเดือน {currentHealthDate}</p>
+                                   <p style={{ margin: '0', fontSize: '12px', fontWeight: 'bold' }}>ประจำเดือน {currentHealthDate}</p>
                                </div>
                            </div>
                            <table className="pdf-table" style={{ width: '100%' }}>
                                  <thead>
                                      <tr>
-                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขที่</th>
-                                         <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขประจำตัว</th>
-                                         <th style={{width: '32%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ชื่อ - สกุล</th>
-                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>นน.</th>
-                                         <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>สส.</th>
-                                         <th style={{width: '14%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ประเมิน</th>
-                                         <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>หมายเหตุ</th>
+                                         <th style={{width: '8%'}}>เลขที่</th>
+                                         <th style={{width: '15%'}}>เลขประจำตัว</th>
+                                         <th style={{width: '32%'}}>ชื่อ - สกุล</th>
+                                         <th style={{width: '8%'}}>นน.</th>
+                                         <th style={{width: '8%'}}>สส.</th>
+                                         <th style={{width: '14%'}}>ประเมิน</th>
+                                         <th style={{width: '15%'}}>หมายเหตุ</th>
                                      </tr>
                                  </thead>
                                  <tbody>
@@ -2059,13 +2401,13 @@
                                         const stText = !active ? (s.status === 'moved' ? 'ย้าย' : 'ไม่มีตัวตน') : '';
                                         const hData = hDataMap[s.id] || {w:'', h:''}; const bmiData = calculateBMI(hData.w, hData.h, s.name);
                                         return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
-                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#64748b' }}>{s.code || s.id}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#475569' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#475569' : '#64748b' }}>{s.code || s.id}</td>
                                            <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#1e293b' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : 'inherit' }}>{!active ? '-' : (hData.w || '-')}</td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#1e293b' : 'inherit' }}>{!active ? '-' : (hData.h || '-')}</td>
-                                           <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#1e293b' : (!active ? '#94a3b8' : '#334155') }}>{!active ? '-' : (bmiData.bmi > 0 ? `${bmiData.bmi} (${bmiData.label})` : '-')}</td>
-                                           <td style={{ color: pdfMode === 'bw' ? '#475569' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
+                                           <td>{!active ? '-' : (hData.w || '-')}</td>
+                                           <td>{!active ? '-' : (hData.h || '-')}</td>
+                                           <td style={{ fontWeight: 'bold', color: pdfMode === 'bw' ? '#334155' : (!active ? '#94a3b8' : '#334155') }}>{!active ? '-' : (bmiData.bmi > 0 ? `${bmiData.bmi} (${bmiData.label})` : '-')}</td>
+                                           <td style={{ color: pdfMode === 'bw' ? '#64748b' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
                                         </tr>
                                      })}
                                  </tbody>
@@ -2084,20 +2426,20 @@
                             <div style={{ flexShrink: 0, paddingBottom: '10px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 {globalSettings?.schoolLogoUrl && <img src={globalSettings.schoolLogoUrl} style={{ height: '40px', width: 'auto', objectFit: 'contain', filter: pdfMode === 'bw' ? 'grayscale(100%)' : 'none' }} crossOrigin="anonymous" />}
                                 <div>
-                                    <h1 className="pdf-header-title" style={{ color: pdfMode === 'bw' ? '#1e293b' : '#4c1d95' }}>รายชื่อนักเรียน ห้อง {settings?.roomName}{groupText}</h1>
-                                    <p className="pdf-header-subtitle" style={{ color: pdfMode === 'bw' ? '#475569' : '#4b5563' }}>โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
+                                    <h1 className="pdf-header-title">รายชื่อนักเรียน ห้อง {settings?.roomName}{groupText}</h1>
+                                    <p className="pdf-header-subtitle">โรงเรียนคำม่วง อำเภอคำม่วง จังหวัดกาฬสินธุ์</p>
                                 </div>
                             </div>
                             <table className="pdf-table" style={{ width: '100%' }}>
                                   <thead>
                                     <tr>
-                                        <th style={{width: '8%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขที่</th>
-                                        <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>เลขประจำตัว</th>
-                                        <th style={{width: '32%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>ชื่อ - สกุล</th>
-                                        <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9'}}></th>
-                                        <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9'}}></th>
-                                        <th style={{width: '10%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9'}}></th>
-                                        <th style={{width: '15%', backgroundColor: pdfMode === 'bw' ? '#fff' : '#6d28d9', color: pdfMode === 'bw' ? '#1e293b' : 'white'}}>หมายเหตุ</th>
+                                        <th style={{width: '8%'}}>เลขที่</th>
+                                        <th style={{width: '15%'}}>เลขประจำตัว</th>
+                                        <th style={{width: '32%'}}>ชื่อ - สกุล</th>
+                                        <th style={{width: '10%'}}></th>
+                                        <th style={{width: '10%'}}></th>
+                                        <th style={{width: '10%'}}></th>
+                                        <th style={{width: '15%'}}>หมายเหตุ</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -2106,11 +2448,11 @@
                                          const active = isActive(s);
                                          const stText = !active ? (s.status === 'moved' ? 'ย้าย' : 'ไม่มีตัวตน') : '';
                                          return <tr key={s.id} style={{ backgroundColor: pdfMode === 'bw' ? '#fff' : (idx % 2 === 0 ? '#faf5ff' : '#ffffff') }}>
-                                            <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
-                                            <td style={{ color: pdfMode === 'bw' ? '#1e293b' : '#64748b' }}>{s.code || s.id}</td>
+                                            <td style={{ color: pdfMode === 'bw' ? '#475569' : '#6b7280', fontWeight: 'bold' }}>{s.number || ''}</td>
+                                            <td style={{ color: pdfMode === 'bw' ? '#475569' : '#64748b' }}>{s.code || s.id}</td>
                                             <td className="text-left-pdf"><span style={{ color: pdfMode === 'bw' ? '#1e293b' : (active ? '#4c1d95' : '#94a3b8') }}>{s.name || ''}</span></td>
                                             <td></td><td></td><td></td>
-                                            <td style={{ color: pdfMode === 'bw' ? '#475569' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
+                                            <td style={{ color: pdfMode === 'bw' ? '#64748b' : '#ef4444', fontSize: '10px', fontWeight: 'bold' }}>{!active ? stText : ''}</td>
                                          </tr>
                                       })}
                                   </tbody>
@@ -2137,10 +2479,10 @@
                                          </div>
                                          <div style={{ flex: 1, padding: '15px', display: 'flex', flexDirection: 'column' }}>
                                              <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#1e293b', marginBottom: '2px', textDecoration: !isActive(s) ? 'line-through' : 'none' }}>{s.name || ''}</div>
-                                             <div style={{ color: pdfMode === 'bw' ? '#1e293b' : '#64748b', fontSize: '11px', fontWeight: 'bold' }}>รหัส: {s.code || s.id}</div>
+                                             <div style={{ color: pdfMode === 'bw' ? '#334155' : '#64748b', fontSize: '11px', fontWeight: 'bold' }}>รหัส: {s.code || s.id}</div>
                                              <div style={{ color: pdfMode === 'bw' ? '#1e293b' : '#6d28d9', fontSize: '11px', fontWeight: 'bold' }}>ห้อง: {settings?.roomName}</div>
                                              <div style={{ marginTop: 'auto', alignSelf: 'flex-end', border: pdfMode === 'bw' ? '1px solid #94a3b8' : '1px solid #cbd5e1', padding: '4px', borderRadius: '6px', backgroundColor: 'white' }}>
-                                                 <QRCodeCanvas text={s.code || s.id} size={65} />
+                                                 <QRCodeCanvas text={s.code || s.id} size={65} isDark={false} />
                                              </div>
                                          </div>
                                      </div>
@@ -2177,18 +2519,11 @@
 
         const [dialogConfig, setDialogConfig] = useState(null);
 
-        // 🟢 ดึงข้อมูล Global Setting จาก Supabase
         useEffect(() => {
             const fetchGlobal = async () => {
                 if(SUPABASE_URL === "YOUR_SUPABASE_URL") return;
                 try {
-                    const { data, error } = await supabase
-                        .from('classflow_data')
-                        .select('payload')
-                        .eq('room', 'admin')
-                        .eq('type', 'settings')
-                        .single();
-                    
+                    const { data, error } = await supabase.from('classflow_data').select('payload').eq('room', 'admin').eq('type', 'settings').single();
                     if (data && data.payload) {
                         setGlobalSettings(data.payload.settings || { schoolLogoUrl: '', zoneCheckUrl: '', adminPin: '123456' });
                         if(data.payload.rooms) setRooms(data.payload.rooms);
@@ -2213,9 +2548,12 @@
             let isValid = false;
             if(credentials.role === 'admin') {
                 if(credentials.pin === (globalSettings.adminPin || '123456')) isValid = true;
-            } else {
+            } else if(credentials.role === 'head') {
                 const roomPin = localStorage.getItem(`cf_${credentials.room}_pin`) || '0000';
                 if(credentials.pin === roomPin) isValid = true;
+            } else {
+                // Student Login - Just check if code is provided
+                isValid = true;
             }
 
             if(isValid) {
@@ -2258,6 +2596,16 @@
              );
         }
 
+        if (userSession.role === 'student') {
+            return (
+                <StudentDashboard 
+                    user={userSession} 
+                    onLogout={() => {localStorage.removeItem('cf_auth_session'); setUserSession(null);}}
+                    globalSettings={globalSettings}
+                />
+            )
+        }
+
         return (
             <React.Fragment>
                 <DashboardLayout 
@@ -2276,7 +2624,6 @@
     const root = ReactDOM.createRoot(document.getElementById('root'));
     
     let globalSetToast = null;
-
     window.showGlobalToast = (msg, type = 'info') => {
        if(globalSetToast) {
            globalSetToast({ msg, type });
